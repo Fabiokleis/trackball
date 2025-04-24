@@ -5,9 +5,6 @@
 #include <chrono>
 #include <thread>
 
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/mat4x4.hpp> // glm::mat4
 #include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
@@ -16,6 +13,13 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 
 #define MOUSE_ICON_FILE "mouse_icon.png"
 
@@ -157,6 +161,13 @@ glm::vec3 mouse_to_gl_point(float x, float y) {
 
 void loop(GLFWwindow *window) {
 
+  ImGui::CreateContext();
+  ImGuiIO& io = ImGui::GetIO(); (void) io;
+  ImGui::StyleColorsDark();
+  ImGui_ImplGlfw_InitForOpenGL(window, true);
+  ImGui_ImplOpenGL3_Init((char *)glGetString(GL_NUM_SHADING_LANGUAGE_VERSIONS));
+
+  
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
   
   int width = 0;
@@ -202,7 +213,7 @@ void loop(GLFWwindow *window) {
   if (error != 0) exit(1);
   
   Vertex vertices[MAX_VERTEX_COUNT];
-  uint32_t idx = 0;  
+  //uint32_t idx = 0;  
 
   glm::vec3 translate = glm::vec3(0.0f, 0.f, 0.f);
   //glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -240,6 +251,12 @@ void loop(GLFWwindow *window) {
   uint32_t mode = GL_FILL;
   
   while (!quit) {
+
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    
     delta = glfwGetTime() - start_time;
     total_time += delta;
     if (delta < frame_time) {
@@ -318,11 +335,33 @@ void loop(GLFWwindow *window) {
     //glBindVertexArray(VAO);
     //draw_triangles(VAO, program, vertices, tidx, triangles);
 
+
+        
+    {
+      static int counter = 0;
+
+      ImGui::Text("Hello, World!");
     
+      if (ImGui::Button("Button"))
+	counter++;
+
+      ImGui::SameLine();
+      ImGui::Text("counter = %d", counter);
+      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    }
+
+
+    
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
   glfwDestroyCursor(cursor);
+
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
 }
 
 int main(int argc, char **argv) {
