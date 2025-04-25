@@ -213,7 +213,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
 
 static void show_global_info() {
   ImGuiIO& io = ImGui::GetIO();
-  static int location = 0;
+  static int location = -1;
   ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
 
   if (location >= 0) {
@@ -239,9 +239,9 @@ static void show_global_info() {
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       ImGui::Separator();
       if (ImGui::IsMousePosValid())
-	ImGui::Text("Mouse Position: (%.1f,%.1f)", io.MousePos.x, io.MousePos.y);
+	ImGui::Text("Posição do mouse: (%.1f,%.1f)", io.MousePos.x, io.MousePos.y);
       else
-	ImGui::Text("Mouse Position: <invalid>");
+	ImGui::Text("Posição do mouse: fora da tela");
       if (ImGui::BeginPopupContextWindow()) {
 	if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
 	if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;
@@ -258,17 +258,17 @@ static void show_global_info() {
 static void show_global_settings(MeshSettings *mesh_set) {
   ImGuiIO& io = ImGui::GetIO(); (void) io;
   static int menu_item = 0;
-  ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
+  ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
   ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
   
   if (ImGui::Begin("mesh", nullptr, window_flags)) {
     ImGui::Text("malha: %s", mesh_set->obj_file);
-    ImGui::Separator();
     ImGui::Text("modo (v): %s", mesh_set->mode == FILL_POLYGON ? "fill polygon" : "polygon wireframe");
-    ImGui::Text("translacao (%.2f, %.2f, %.2f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
-    ImGui::Text("scala      (%.2f, %.2f, %.2f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
-    ImGui::Text("eixo       (%.1f, %.1f, %.1f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
-    
+    ImGui::Separator();
+    ImGui::Text("vertices: %lu", mesh_set->t_verts);
+    ImGui::Text("triangulos: %lu", mesh_set->t_idx / 3);
+    ImGui::Text("indices: %lu", mesh_set->t_idx);
+
     if (ImGui::BeginPopupContextWindow()) {
       if (ImGui::MenuItem("trocar modo (v)", NULL, menu_item == 1)) {
 	menu_item = 0;
@@ -276,6 +276,21 @@ static void show_global_settings(MeshSettings *mesh_set) {
       }
       ImGui::EndPopup();
     }
+  }
+  ImGui::End();
+}
+
+static void show_model_matrix(MeshSettings *mesh_set) {
+  ImGuiIO& io = ImGui::GetIO(); (void) io;
+  static int menu_item = 0;
+  ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
+  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+  
+  if (ImGui::Begin("model", nullptr, window_flags)) {
+    ImGui::Separator();
+    ImGui::Text("translacao (%.2f, %.2f, %.2f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
+    ImGui::Text("scala      (%.2f, %.2f, %.2f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
+    ImGui::Text("eixo       (%.1f, %.1f, %.1f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
   }
   ImGui::End();
 }
@@ -347,7 +362,6 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, mesh_set.t_verts * sizeof(Vertex), &mesh_set.vertices[0], GL_STATIC_DRAW);
-  //glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * mesh_set.t_verts, mesh_set.vertices, GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_set.t_idx * sizeof(mesh_set.indices[0]), &mesh_set.indices[0], GL_STATIC_DRAW);
@@ -468,6 +482,7 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
 
     show_global_info();
     show_global_settings(&mesh_set);
+    show_model_matrix(&mesh_set);
     
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -497,16 +512,11 @@ int main(int argc, char **argv) {
   const auto &p = result.attributes.positions;
 
   for (const auto &index : indices) {
-    std::cout << "indice: " << (uint32_t)index.position_index << std::endl;
     idx.push_back((uint32_t)index.position_index);
   }
 
   std::vector<Position> positions;
-  std::cout << "p size: " << p.size() << std::endl;
   for (uint32_t i = 0; i < p.size(); i += 3){
-    std::cout << "pos x: " << p[i] << std::endl;
-    std::cout << "pos y: " << p[i+1] << std::endl;
-    std::cout << "pos z: " << p[i+2] << std::endl;
     Position pos = (Position){
       .x = p[i + 0],
       .y = p[i + 1],
@@ -526,51 +536,14 @@ int main(int argc, char **argv) {
       }
     );
   }
-
-  // float vertices[] = {
-  //   0.5f,  0.5f, 0.0f,  // top right
-  //   0.5f, -0.5f, 0.0f,  // bottom right
-  //   -0.5f, -0.5f, 0.0f,  // bottom left
-  //   -0.5f,  0.5f, 0.0f   // top left 
-  // };
-  
-  // unsigned int indices[] = {  // note that we start from 0!
-  //   0, 1, 3,  // first Triangle
-  //   1, 2, 3   // second Triangle
-  // };
-
-  // for (uint32_t i = 0; i < sizeof(vertices)/sizeof(float); i += 3) {
-  //   Position pos = (Position){
-  //     .x = vertices[i],
-  //     .y = vertices[i+1],
-  //     .z = vertices[i+2],
-  //     .w = 1.0f
-  //   };
-
-  //   Color color = (Color){
-  //     .r = 1.0f,
-  //     .g = 0.5f,
-  //     .b = 1.0f,
-  //     .a = 1.0f,
-  //   };
-
-  //   verts.push_back(
-  //     (Vertex){
-  // 	.position = pos,
-  // 	.color = color,
-  //     }
-  //   );
-  // }
   
   MeshSettings mesh_set = (MeshSettings){
     .obj_file = argv[1],
     .mode = FILL_POLYGON,
     .vertices = verts,
     .t_verts = verts.size(),
-    //.indices = &indices[0],
     .indices = idx,
     .t_idx = idx.size(),
-    //.t_idx = sizeof(indices) / sizeof(indices[0]),
     .translate = glm::vec3(0.0f),
     .scale = glm::vec3(0.5f),
     .angle = 0.0f,
@@ -584,7 +557,6 @@ int main(int argc, char **argv) {
   std::cout << "mesh idx size: " << sizeof(mesh_set.indices[0]) * mesh_set.t_idx << std::endl;
  
 
-  
   if (!glfwInit()) {
     std::cerr << "Could not initialize glfw!" << std::endl;
     std::cerr << "error: " << strerror(errno) << std::endl;
