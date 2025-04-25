@@ -127,10 +127,10 @@ void resize_callback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, width, height);
 }
 
-glm::vec3 scale = glm::vec3(1.0f);
+glm::vec3 scale = glm::vec3(.5f);
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-  scale += (yoffset * .5f);
+  scale += (yoffset * .05f);
   std::cout << "scale: " << glm::to_string(scale) << std::endl;
 }
 
@@ -162,9 +162,9 @@ enum VISUALIZATION_MODE {
 typedef struct {
   const char *obj_file;
   VISUALIZATION_MODE mode;
-  Vertex *vertices;
+  std::vector<Vertex> vertices;
   uint64_t t_verts;
-  uint32_t *indices;
+  std::vector<uint32_t> indices;
   uint64_t t_idx;
   glm::vec3 translate;
   glm::vec3 scale;
@@ -207,8 +207,8 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   glUniform1f(v_time, time);
 
   glBindVertexArray(VAO);
-  //glDrawArrays(GL_TRIANGLES, 0, mesh_set.size);
   glDrawElements(GL_TRIANGLES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
+  //glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
 }
 
 static void show_global_info() {
@@ -265,9 +265,9 @@ static void show_global_settings(MeshSettings *mesh_set) {
     ImGui::Text("malha: %s", mesh_set->obj_file);
     ImGui::Separator();
     ImGui::Text("modo (v): %s", mesh_set->mode == FILL_POLYGON ? "fill polygon" : "polygon wireframe");
-    ImGui::Text("translacao (%f, %f, %f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
-    ImGui::Text("scale (%f, %f, %f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
-    ImGui::Text("eixo (%f, %f, %f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
+    ImGui::Text("translacao (%.2f, %.2f, %.2f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
+    ImGui::Text("scala      (%.2f, %.2f, %.2f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
+    ImGui::Text("eixo       (%.1f, %.1f, %.1f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
     
     if (ImGui::BeginPopupContextWindow()) {
       if (ImGui::MenuItem("trocar modo (v)", NULL, menu_item == 1)) {
@@ -346,10 +346,11 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   glBindVertexArray(VAO);
   
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, mesh_set.t_verts * sizeof(Vertex), mesh_set.vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, mesh_set.t_verts * sizeof(Vertex), &mesh_set.vertices[0], GL_STATIC_DRAW);
+  //glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * mesh_set.t_verts, mesh_set.vertices, GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_set.t_idx * sizeof(mesh_set.indices[0]), mesh_set.indices, GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_set.t_idx * sizeof(mesh_set.indices[0]), &mesh_set.indices[0], GL_STATIC_DRAW);
   
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
   glEnableVertexAttribArray(0); // location 0
@@ -358,6 +359,8 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   glEnableVertexAttribArray(1); // location 1
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  glBindVertexArray(0); 
 
   glEnable(GL_DEPTH_TEST);
 
@@ -486,32 +489,64 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  //const auto &shape = result.shapes[0];
   std::vector<Vertex> verts;
   std::vector<uint32_t> idx;
-  // const auto &p = result.attributes.positions;
-
-  // for (uint32_t i = 0; i < shape.mesh.indices.size(); ++i) {
-  //   idx.push_back(i);
-  // }
-
-  // for (const auto& i : shape.mesh.indices) {
-  //   std::cout << "indice: " << (uint32_t)i.position_index << std::endl;
-  //   idx.push_back((uint32_t)i.position_index);
-  // }
   
-  // for (uint32_t i = 0; i < shape.mesh.indices; ++i) {
-  //   indices[indexOffset + i] = indexOffset + i;
+  const auto &shape = result.shapes[0];
+  const auto &indices = shape.mesh.indices;
+  const auto &p = result.attributes.positions;
 
+  for (const auto &index : indices) {
+    std::cout << "indice: " << (uint32_t)index.position_index << std::endl;
+    idx.push_back((uint32_t)index.position_index);
+  }
+
+  std::vector<Position> positions;
+  std::cout << "p size: " << p.size() << std::endl;
+  for (uint32_t i = 0; i < p.size(); i += 3){
+    std::cout << "pos x: " << p[i] << std::endl;
+    std::cout << "pos y: " << p[i+1] << std::endl;
+    std::cout << "pos z: " << p[i+2] << std::endl;
+    Position pos = (Position){
+      .x = p[i + 0],
+      .y = p[i + 1],
+      .z = p[i + 2],
+      .w = 1.0f
+    };
+    Color color = (Color){
+      .r = 1.0f,
+      .g = 0.5f,
+      .b = 1.0f,
+      .a = 1.0f,
+    };
+    verts.push_back(
+      (Vertex){
+	.position = pos,
+	.color = color,
+      }
+    );
+  }
+
+  // float vertices[] = {
+  //   0.5f,  0.5f, 0.0f,  // top right
+  //   0.5f, -0.5f, 0.0f,  // bottom right
+  //   -0.5f, -0.5f, 0.0f,  // bottom left
+  //   -0.5f,  0.5f, 0.0f   // top left 
+  // };
+  
+  // unsigned int indices[] = {  // note that we start from 0!
+  //   0, 1, 3,  // first Triangle
+  //   1, 2, 3   // second Triangle
+  // };
+
+  // for (uint32_t i = 0; i < sizeof(vertices)/sizeof(float); i += 3) {
   //   Position pos = (Position){
-  //     .x = p[i],
-  //     .y = p[i+1],
-  //     .z = p[i+2],
+  //     .x = vertices[i],
+  //     .y = vertices[i+1],
+  //     .z = vertices[i+2],
   //     .w = 1.0f
   //   };
-  //   std::cout << "pos x: " << p[i] << std::endl;
-  //   std::cout << "pos y: " << p[i+1] << std::endl;
-  //   std::cout << "pos z: " << p[i+2] << std::endl;
+
   //   Color color = (Color){
   //     .r = 1.0f,
   //     .g = 0.5f,
@@ -526,53 +561,18 @@ int main(int argc, char **argv) {
   //     }
   //   );
   // }
-
-  float vertices[] = {
-    0.5f,  0.5f, 0.0f,  // top right
-    0.5f, -0.5f, 0.0f,  // bottom right
-    -0.5f, -0.5f, 0.0f,  // bottom left
-    -0.5f,  0.5f, 0.0f   // top left 
-  };
-  
-  unsigned int indices[] = {  // note that we start from 0!
-    0, 1, 3,  // first Triangle
-    1, 2, 3   // second Triangle
-  };
-
-  for (uint32_t i = 0; i < sizeof(vertices)/sizeof(float); i += 3) {
-    Position pos = (Position){
-      .x = vertices[i],
-      .y = vertices[i+1],
-      .z = vertices[i+2],
-      .w = 1.0f
-    };
-
-    Color color = (Color){
-      .r = 1.0f,
-      .g = 0.5f,
-      .b = 1.0f,
-      .a = 1.0f,
-    };
-
-    verts.push_back(
-      (Vertex){
-	.position = pos,
-	.color = color,
-      }
-    );
-  }
   
   MeshSettings mesh_set = (MeshSettings){
     .obj_file = argv[1],
     .mode = FILL_POLYGON,
-    .vertices = &verts[0],
+    .vertices = verts,
     .t_verts = verts.size(),
-    .indices = &indices[0],
-    //.indices = &idx[0],
-    //.t_idx = idx.size(),
-    .t_idx = sizeof(indices) / sizeof(indices[0]),
+    //.indices = &indices[0],
+    .indices = idx,
+    .t_idx = idx.size(),
+    //.t_idx = sizeof(indices) / sizeof(indices[0]),
     .translate = glm::vec3(0.0f),
-    .scale = glm::vec3(1.0f),
+    .scale = glm::vec3(0.5f),
     .angle = 0.0f,
     .axis = glm::vec3(1.0f)
   };
@@ -580,6 +580,8 @@ int main(int argc, char **argv) {
   std::cout << "mesh total triangles: " << mesh_set.t_idx / 3 << std::endl;
   std::cout << "mesh total idx: " << mesh_set.t_idx << std::endl;
   std::cout << "mesh total verts: " << mesh_set.t_verts << std::endl;
+  std::cout << "mesh verts size: " << sizeof(Vertex) * mesh_set.t_verts << std::endl;
+  std::cout << "mesh idx size: " << sizeof(mesh_set.indices[0]) * mesh_set.t_idx << std::endl;
  
 
   

@@ -24,7 +24,7 @@ all: $(EXE)
 	@echo $(ECHO_MESSAGE)
 
 obj.o: obj.cpp obj.hpp rapidobj.hpp
-	$(CXX) -c obj.cpp $@ $<
+	$(CXX) -c $<
 
 $(EXE): $(OBJS)
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
