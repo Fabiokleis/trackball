@@ -9,7 +9,7 @@ OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 CXXFLAGS = -std=c++17 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -g -Wall -Wformat `pkg-config --cflags glfw3`
 LIBS = -pthread -lglfw -lGLEW -lGL -lm
 
-ECHO_MESSAGE = "Linux "$(EXE)
+ECHO_MESSAGE = "linux compiled $(EXE)"
 
 %.o:%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
@@ -21,7 +21,7 @@ ECHO_MESSAGE = "Linux "$(EXE)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 all: $(EXE)
-	@echo Build complete for $(ECHO_MESSAGE)
+	@echo $(ECHO_MESSAGE)
 
 obj.o: obj.cpp obj.hpp rapidobj.hpp
 	$(CXX) -c obj.cpp $@ $<

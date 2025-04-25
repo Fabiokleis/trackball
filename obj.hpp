@@ -1,10 +1,12 @@
 #ifndef OBJ_H
 #define OBJ_H
 
+#include "rapidobj.hpp"
+
 class ObjLoader
 {
 public:
-  static void load_obj(int argc, char **argv);
+  static rapidobj::Result load_obj(int argc, char **argv);
 };
 
 

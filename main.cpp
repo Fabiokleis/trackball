@@ -154,20 +154,142 @@ typedef struct {
   Color color;
 } Vertex;
 
+enum VISUALIZATION_MODE {
+  FILL_POLYGON,
+  WIREFRAME,
+};
+
+typedef struct {
+  const char *obj_file;
+  VISUALIZATION_MODE mode;
+  Vertex *vertices;
+  uint64_t t_verts;
+  uint32_t *indices;
+  uint64_t t_idx;
+  glm::vec3 translate;
+  glm::vec3 scale;
+  float angle;
+  glm::vec3 axis;
+} MeshSettings;
+
+uint32_t put_vertice(uint32_t idx, Vertex vertices[MAX_VERTEX_COUNT], Position pos, Color color) {
+  vertices[idx].position = pos;
+  vertices[idx].color = color;
+  //vertices[idx].size = 10.0f;
+  return idx;
+}
+
 // mouse offset 1 -1
 glm::vec3 mouse_to_gl_point(float x, float y) {
   return glm::vec3((2.0f * x) / WIDTH - 1.0f, 1.0f - (2.0f * y) / HEIGHT, 0.0f);
 }
 
-void loop(GLFWwindow *window) {
+void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
+  float time = (float)glfwGetTime();
+  glm::mat4 view = glm::mat4(1.0f);
+  view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+  glm::mat4 projection = glm::mat4(1.0f);
+
+  glm::mat4 model = glm::mat4(1.0f);
+  model = glm::translate(model, mesh_set.translate);
+  model = glm::rotate(model, glm::radians(mesh_set.angle * time), mesh_set.axis);
+  model = glm::scale(model, mesh_set.scale);
+
+  projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
+
+  int v_model = glGetUniformLocation(program, "v_model");
+  int v_view = glGetUniformLocation(program, "v_view");
+  int v_projection = glGetUniformLocation(program, "v_projection");
+  int v_time = glGetUniformLocation(program, "v_time");
+  glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
+  glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
+  glUniformMatrix4fv(v_projection, 1, GL_FALSE, &projection[0][0]);
+  glUniform1f(v_time, time);
+
+  glBindVertexArray(VAO);
+  //glDrawArrays(GL_TRIANGLES, 0, mesh_set.size);
+  glDrawElements(GL_TRIANGLES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
+}
+
+static void show_global_info() {
+  ImGuiIO& io = ImGui::GetIO();
+  static int location = 0;
+  ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
+
+  if (location >= 0) {
+    const float PAD = 10.0f;
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
+    ImVec2 work_size = viewport->WorkSize;
+    ImVec2 window_pos, window_pos_pivot;
+    window_pos.x = (location & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
+    window_pos.y = (location & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
+    window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
+    window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
+    window_flags |= ImGuiWindowFlags_NoMove;
+  } else if (location == -2) {
+    // Center window
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    window_flags |= ImGuiWindowFlags_NoMove;
+  }
+      
+  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+  if (ImGui::Begin("info", nullptr, window_flags)) {
+      ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Separator();
+      if (ImGui::IsMousePosValid())
+	ImGui::Text("Mouse Position: (%.1f,%.1f)", io.MousePos.x, io.MousePos.y);
+      else
+	ImGui::Text("Mouse Position: <invalid>");
+      if (ImGui::BeginPopupContextWindow()) {
+	if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
+	if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;
+	if (ImGui::MenuItem("Top-left",     NULL, location == 0)) location = 0;
+	if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
+	if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
+	if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
+	ImGui::EndPopup();
+      }
+  }
+  ImGui::End();
+}
+
+static void show_global_settings(MeshSettings *mesh_set) {
+  ImGuiIO& io = ImGui::GetIO(); (void) io;
+  static int menu_item = 0;
+  ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
+  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+  
+  if (ImGui::Begin("mesh", nullptr, window_flags)) {
+    ImGui::Text("malha: %s", mesh_set->obj_file);
+    ImGui::Separator();
+    ImGui::Text("modo (v): %s", mesh_set->mode == FILL_POLYGON ? "fill polygon" : "polygon wireframe");
+    ImGui::Text("translacao (%f, %f, %f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
+    ImGui::Text("scale (%f, %f, %f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
+    ImGui::Text("eixo (%f, %f, %f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
+    
+    if (ImGui::BeginPopupContextWindow()) {
+      if (ImGui::MenuItem("trocar modo (v)", NULL, menu_item == 1)) {
+	menu_item = 0;
+	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
+      }
+      ImGui::EndPopup();
+    }
+  }
+  ImGui::End();
+}
+
+void loop(GLFWwindow *window, MeshSettings mesh_set) {
 
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO(); (void) io;
-  ImGui::StyleColorsDark();
+  ImGuiIO& io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+  ImGui::StyleColorsClassic();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init((char *)glGetString(GL_NUM_SHADING_LANGUAGE_VERSIONS));
 
-  
   glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
   
   int width = 0;
@@ -211,23 +333,23 @@ void loop(GLFWwindow *window) {
   uint32_t program;
   int error = compile_shaders(&program);
   if (error != 0) exit(1);
-  
-  Vertex vertices[MAX_VERTEX_COUNT];
-  //uint32_t idx = 0;  
 
   glm::vec3 translate = glm::vec3(0.0f, 0.f, 0.f);
-  //glm::vec3 scale = glm::vec3(1.0f, 1.0f, 1.0f);
   float angle = 0.0f;
 
-  uint32_t VAO, VBO;
+  uint32_t VAO, VBO, EBO;
 
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
 
   glBindVertexArray(VAO);
   
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, mesh_set.t_verts * sizeof(Vertex), mesh_set.vertices, GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_set.t_idx * sizeof(mesh_set.indices[0]), mesh_set.indices, GL_STATIC_DRAW);
   
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
   glEnableVertexAttribArray(0); // location 0
@@ -235,7 +357,10 @@ void loop(GLFWwindow *window) {
   glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
   glEnableVertexAttribArray(1); // location 1
 
-  glBindBuffer(GL_ARRAY_BUFFER, 0); 
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+  glEnable(GL_DEPTH_TEST);
+
 
   float start_time = glfwGetTime();
   float delta = 0.0f;
@@ -244,18 +369,18 @@ void loop(GLFWwindow *window) {
   float frame_time = 1.0f / 30.0f;
   
   float click_time = 0.0f;
-  float threshold = 0.3f; // threshold
+  float threshold = 0.2f; // mouse
 
+  float key_time = 0.0f;
+  float key_threshold = 0.2f;
   uint32_t total_click = 0;
-
-  uint32_t mode = GL_FILL;
   
   while (!quit) {
 
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-
+    
     
     delta = glfwGetTime() - start_time;
     total_time += delta;
@@ -296,28 +421,27 @@ void loop(GLFWwindow *window) {
     } else if (is_key_pressed(window, GLFW_KEY_D)) {
       angle = ((int)angle - 5) % 360;
       std::cout << "rotated: " << angle << std::endl;      
+    } else if (is_key_pressed(window, GLFW_KEY_V)) {
+      if (start_time - key_time > key_threshold) {
+	key_time = start_time;
+	mesh_set.mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set.mode + 1) % (WIREFRAME + 1));
+      }
     }
+
+    glPolygonMode(GL_FRONT_AND_BACK, mesh_set.mode == FILL_POLYGON ? GL_FILL : GL_LINE);
 
     if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_LEFT)) {
       if (start_time - click_time > threshold) {
 	click_time = start_time;
-	glClearColor(0.99, 0.3, 0.3, 1.0);
+	//glClearColor(0.99, 0.3, 0.3, 1.0);
 
 	total_click++;
-	std::cout << "mouse x: " << mouse_pos.x << std::endl;
-	std::cout << "mouse y: " << mouse_pos.y << std::endl;
       }
 
     } else if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_RIGHT)) {
       if (start_time - click_time > threshold) {
 	click_time = start_time;
-	if (mode == GL_FILL) mode = GL_LINE;
-	else mode = GL_FILL;
-	glClearColor(0.99, 0.3, 0.3, 1.0);
-	glPolygonMode(GL_FRONT_AND_BACK, mode);
 	total_click++;
-	std::cout << "mouse x: " << mouse_pos.x << std::endl;
-	std::cout << "mouse y: " << mouse_pos.y << std::endl;
       }
     }
     else {
@@ -328,29 +452,19 @@ void loop(GLFWwindow *window) {
       }
     }
 
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(program);
 
+    mesh_set.translate = translate;
+    mesh_set.scale = scale;
+    mesh_set.angle = angle;
+    //mesh_set.axis = axis;
     //glBindVertexArray(VAO);
-    //draw_triangles(VAO, program, vertices, tidx, triangles);
+    draw(VAO, program, mesh_set);
 
-
-        
-    {
-      static int counter = 0;
-
-      ImGui::Text("Hello, World!");
-    
-      if (ImGui::Button("Button"))
-	counter++;
-
-      ImGui::SameLine();
-      ImGui::Text("counter = %d", counter);
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-    }
-
-
+    show_global_info();
+    show_global_settings(&mesh_set);
     
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -366,7 +480,108 @@ void loop(GLFWwindow *window) {
 
 int main(int argc, char **argv) {
 
-  ObjLoader::load_obj(argc, argv);
+  auto result = ObjLoader::load_obj(argc, argv);
+  if (result.shapes.empty()) {
+    std::cerr << "precisa de 1 shape" << std::endl;
+    exit(1);
+  }
+
+  //const auto &shape = result.shapes[0];
+  std::vector<Vertex> verts;
+  std::vector<uint32_t> idx;
+  // const auto &p = result.attributes.positions;
+
+  // for (uint32_t i = 0; i < shape.mesh.indices.size(); ++i) {
+  //   idx.push_back(i);
+  // }
+
+  // for (const auto& i : shape.mesh.indices) {
+  //   std::cout << "indice: " << (uint32_t)i.position_index << std::endl;
+  //   idx.push_back((uint32_t)i.position_index);
+  // }
+  
+  // for (uint32_t i = 0; i < shape.mesh.indices; ++i) {
+  //   indices[indexOffset + i] = indexOffset + i;
+
+  //   Position pos = (Position){
+  //     .x = p[i],
+  //     .y = p[i+1],
+  //     .z = p[i+2],
+  //     .w = 1.0f
+  //   };
+  //   std::cout << "pos x: " << p[i] << std::endl;
+  //   std::cout << "pos y: " << p[i+1] << std::endl;
+  //   std::cout << "pos z: " << p[i+2] << std::endl;
+  //   Color color = (Color){
+  //     .r = 1.0f,
+  //     .g = 0.5f,
+  //     .b = 1.0f,
+  //     .a = 1.0f,
+  //   };
+
+  //   verts.push_back(
+  //     (Vertex){
+  // 	.position = pos,
+  // 	.color = color,
+  //     }
+  //   );
+  // }
+
+  float vertices[] = {
+    0.5f,  0.5f, 0.0f,  // top right
+    0.5f, -0.5f, 0.0f,  // bottom right
+    -0.5f, -0.5f, 0.0f,  // bottom left
+    -0.5f,  0.5f, 0.0f   // top left 
+  };
+  
+  unsigned int indices[] = {  // note that we start from 0!
+    0, 1, 3,  // first Triangle
+    1, 2, 3   // second Triangle
+  };
+
+  for (uint32_t i = 0; i < sizeof(vertices)/sizeof(float); i += 3) {
+    Position pos = (Position){
+      .x = vertices[i],
+      .y = vertices[i+1],
+      .z = vertices[i+2],
+      .w = 1.0f
+    };
+
+    Color color = (Color){
+      .r = 1.0f,
+      .g = 0.5f,
+      .b = 1.0f,
+      .a = 1.0f,
+    };
+
+    verts.push_back(
+      (Vertex){
+	.position = pos,
+	.color = color,
+      }
+    );
+  }
+  
+  MeshSettings mesh_set = (MeshSettings){
+    .obj_file = argv[1],
+    .mode = FILL_POLYGON,
+    .vertices = &verts[0],
+    .t_verts = verts.size(),
+    .indices = &indices[0],
+    //.indices = &idx[0],
+    //.t_idx = idx.size(),
+    .t_idx = sizeof(indices) / sizeof(indices[0]),
+    .translate = glm::vec3(0.0f),
+    .scale = glm::vec3(1.0f),
+    .angle = 0.0f,
+    .axis = glm::vec3(1.0f)
+  };
+
+  std::cout << "mesh total triangles: " << mesh_set.t_idx / 3 << std::endl;
+  std::cout << "mesh total idx: " << mesh_set.t_idx << std::endl;
+  std::cout << "mesh total verts: " << mesh_set.t_verts << std::endl;
+ 
+
   
   if (!glfwInit()) {
     std::cerr << "Could not initialize glfw!" << std::endl;
@@ -408,7 +623,7 @@ int main(int argc, char **argv) {
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   
-  loop(window);
+  loop(window, mesh_set);
 
   glfwTerminate();
   return 0;
