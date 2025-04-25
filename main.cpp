@@ -26,10 +26,6 @@
 #define WIDTH 860
 #define HEIGHT 640
 
-#define MAX_TRIANGLES 1000
-#define MAX_VERTEX_COUNT MAX_TRIANGLES * 3
-#define MAX_IDX_COUNT MAX_TRIANGLES * 3
-
 #include "obj.hpp"
 
 const static char *vertex_shader_source = R"(
@@ -172,7 +168,7 @@ typedef struct {
   glm::vec3 axis;
 } MeshSettings;
 
-uint32_t put_vertice(uint32_t idx, Vertex vertices[MAX_VERTEX_COUNT], Position pos, Color color) {
+uint32_t put_vertice(uint32_t idx, std::vector<Vertex> vertices, Position pos, Color color) {
   vertices[idx].position = pos;
   vertices[idx].color = color;
   //vertices[idx].size = 10.0f;
@@ -529,7 +525,6 @@ int main(int argc, char **argv) {
 	  std::cout << "-k: mostra a mensagem de controles." << std::endl;
     } break;
     }
-
     return 0;
   }
 
