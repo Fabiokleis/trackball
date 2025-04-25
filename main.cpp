@@ -498,6 +498,41 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
 
 int main(int argc, char **argv) {
 
+  uint32_t count = 0; 
+  while(argv[++count] != NULL);
+  
+  if (argc != 2 || (count > 2 && argv[1][0] == '-')) {
+    std::cerr << "opção inválida, passe -h para mostrar a mensagem de help." << std::endl;
+    exit(1);
+  }
+
+
+  if (argc == 2 && (count && argv[1][0] == '-')) {
+    switch (argv[1][1]) {
+    case 'k': {
+      std::cout << "controles disponiveis: " << std::endl << std::endl;
+      std::cout << "(v): troca o modo de visualização de fill para line (wireframe)." << std::endl;
+      std::cout << "(w): faz deslocamento positivo em z." << std::endl;
+      std::cout << "(s): faz deslocamento negativo em z." << std::endl;
+      std::cout << "(seta para baixo): faz deslocamento negativo em y." << std::endl;
+      std::cout << "(seta para cima): faz deslocamento postivo em y." << std::endl;
+      std::cout << "(seta para esquerda): faz deslocamento negativo em x." << std::endl;
+      std::cout << "(seta para direita): faz deslocamento positivo em x." << std::endl << std::endl;
+      std::cout << "para ler novamente passe a opção -k ou acesse a tela de controles." << std::endl;
+    } break;
+    case 'h':
+    default: {
+      	  std::cout << "para executar o mesh passe um arquivo .obj: " << std::endl;
+	  std::cout << "./mesh cube.obj" << std::endl << std::endl;
+      	  std::cout << "opções: " << std::endl;
+	  std::cout << "-h: mostra essa mensagem." << std::endl;
+	  std::cout << "-k: mostra a mensagem de controles." << std::endl;
+    } break;
+    }
+
+    return 0;
+  }
+
   auto result = ObjLoader::load_obj(argc, argv);
   if (result.shapes.empty()) {
     std::cerr << "precisa de 1 shape" << std::endl;
