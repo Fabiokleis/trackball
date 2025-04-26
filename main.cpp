@@ -26,6 +26,16 @@
 #define WIDTH 860
 #define HEIGHT 640
 
+#define V_KEY "(v): troca o modo de visualização de fill para line (wireframe)."
+#define W_KEY "(w): faz deslocamento positivo em z."
+#define S_KEY "(s): faz deslocamento negativo em z."
+#define DOWN_KEY "(seta para baixo): faz deslocamento negativo em y."
+#define UP_KEY "(seta para cima): faz deslocamento postivo em y."
+#define LEFT_KEY "(seta para esquerda): faz deslocamento negativo em x."
+#define RIGHT_KEY "(seta para direita): faz deslocamento positivo em x."
+#define KEYS "para ler novamente passe a opção -k ou acesse a tela de controles."
+
+#include "mesh.hpp"
 #include "obj.hpp"
 
 const static char *vertex_shader_source = R"(
@@ -51,7 +61,8 @@ const static char *fragment_shader_source = R"(
   void main()
   {
      vec4 c = color * (sin(v_time) / cos(v_time));
-     FragColor = vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f);
+     //FragColor = vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f);
+     FragColor = color;
   };
 )";
 
@@ -136,45 +147,6 @@ Vec2 get_mouse_pos(GLFWwindow *window) {
 
     return Vec2{ .x = xpos, .y = ypos };
 }
-
-typedef struct {
-  float x, y, z, w;
-} Position;
-
-typedef struct {
-  float r, g, b, a;
-} Color;
-
-typedef struct {
-  Position position;
-  Color color;
-} Vertex;
-
-enum VISUALIZATION_MODE {
-  FILL_POLYGON,
-  WIREFRAME,
-};
-
-typedef struct {
-  const char *obj_file;
-  VISUALIZATION_MODE mode;
-  std::vector<Vertex> vertices;
-  uint64_t t_verts;
-  std::vector<uint32_t> indices;
-  uint64_t t_idx;
-  glm::vec3 translate;
-  glm::vec3 scale;
-  float angle;
-  glm::vec3 axis;
-} MeshSettings;
-
-uint32_t put_vertice(uint32_t idx, std::vector<Vertex> vertices, Position pos, Color color) {
-  vertices[idx].position = pos;
-  vertices[idx].color = color;
-  //vertices[idx].size = 10.0f;
-  return idx;
-}
-
 // mouse offset 1 -1
 glm::vec3 mouse_to_gl_point(float x, float y) {
   return glm::vec3((2.0f * x) / WIDTH - 1.0f, 1.0f - (2.0f * y) / HEIGHT, 0.0f);
@@ -203,92 +175,9 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   glUniform1f(v_time, time);
 
   glBindVertexArray(VAO);
-  glDrawElements(GL_TRIANGLES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
-  //glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
-}
-
-static void show_global_info() {
-  ImGuiIO& io = ImGui::GetIO();
-  static int location = -1;
-  ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
-
-  if (location >= 0) {
-    const float PAD = 10.0f;
-    const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 work_pos = viewport->WorkPos; // Use work area to avoid menu-bar/task-bar, if any!
-    ImVec2 work_size = viewport->WorkSize;
-    ImVec2 window_pos, window_pos_pivot;
-    window_pos.x = (location & 1) ? (work_pos.x + work_size.x - PAD) : (work_pos.x + PAD);
-    window_pos.y = (location & 2) ? (work_pos.y + work_size.y - PAD) : (work_pos.y + PAD);
-    window_pos_pivot.x = (location & 1) ? 1.0f : 0.0f;
-    window_pos_pivot.y = (location & 2) ? 1.0f : 0.0f;
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, window_pos_pivot);
-    window_flags |= ImGuiWindowFlags_NoMove;
-  } else if (location == -2) {
-    // Center window
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-    window_flags |= ImGuiWindowFlags_NoMove;
-  }
-      
-  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
-  if (ImGui::Begin("info", nullptr, window_flags)) {
-      ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-      ImGui::Separator();
-      if (ImGui::IsMousePosValid())
-	ImGui::Text("Posição do mouse: (%.1f,%.1f)", io.MousePos.x, io.MousePos.y);
-      else
-	ImGui::Text("Posição do mouse: fora da tela");
-      if (ImGui::BeginPopupContextWindow()) {
-	if (ImGui::MenuItem("Custom",       NULL, location == -1)) location = -1;
-	if (ImGui::MenuItem("Center",       NULL, location == -2)) location = -2;
-	if (ImGui::MenuItem("Top-left",     NULL, location == 0)) location = 0;
-	if (ImGui::MenuItem("Top-right",    NULL, location == 1)) location = 1;
-	if (ImGui::MenuItem("Bottom-left",  NULL, location == 2)) location = 2;
-	if (ImGui::MenuItem("Bottom-right", NULL, location == 3)) location = 3;
-	ImGui::EndPopup();
-      }
-  }
-  ImGui::End();
-}
-
-static void show_global_settings(MeshSettings *mesh_set) {
-  ImGuiIO& io = ImGui::GetIO(); (void) io;
-  static int menu_item = 0;
-  ImGuiWindowFlags window_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
-  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
-  
-  if (ImGui::Begin("mesh", nullptr, window_flags)) {
-    ImGui::Text("malha: %s", mesh_set->obj_file);
-    ImGui::Text("modo (v): %s", mesh_set->mode == FILL_POLYGON ? "fill polygon" : "polygon wireframe");
-    ImGui::Separator();
-    ImGui::Text("vertices: %lu", mesh_set->t_verts);
-    ImGui::Text("triangulos: %lu", mesh_set->t_idx / 3);
-    ImGui::Text("indices: %lu", mesh_set->t_idx);
-
-    if (ImGui::BeginPopupContextWindow()) {
-      if (ImGui::MenuItem("trocar modo (v)", NULL, menu_item == 1)) {
-	menu_item = 0;
-	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
-      }
-      ImGui::EndPopup();
-    }
-  }
-  ImGui::End();
-}
-
-static void show_model_matrix(MeshSettings *mesh_set) {
-  ImGuiIO& io = ImGui::GetIO(); (void) io;
-  static int menu_item = 0;
-  ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
-  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
-  
-  if (ImGui::Begin("model", nullptr, window_flags)) {
-    ImGui::Separator();
-    ImGui::Text("translacao (%.2f, %.2f, %.2f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
-    ImGui::Text("scala      (%.2f, %.2f, %.2f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
-    ImGui::Text("eixo       (%.1f, %.1f, %.1f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
-  }
-  ImGui::End();
+  //glDrawElements(GL_TRIANGLES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
+  //glDrawElements(GL_LINES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
+  glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
 }
 
 void loop(GLFWwindow *window, MeshSettings mesh_set) {
@@ -507,13 +396,13 @@ int main(int argc, char **argv) {
     switch (argv[1][1]) {
     case 'k': {
       std::cout << "controles disponiveis: " << std::endl << std::endl;
-      std::cout << "(v): troca o modo de visualização de fill para line (wireframe)." << std::endl;
-      std::cout << "(w): faz deslocamento positivo em z." << std::endl;
-      std::cout << "(s): faz deslocamento negativo em z." << std::endl;
-      std::cout << "(seta para baixo): faz deslocamento negativo em y." << std::endl;
-      std::cout << "(seta para cima): faz deslocamento postivo em y." << std::endl;
-      std::cout << "(seta para esquerda): faz deslocamento negativo em x." << std::endl;
-      std::cout << "(seta para direita): faz deslocamento positivo em x." << std::endl << std::endl;
+      std::cout << V_KEY << std::endl;
+      std::cout << W_KEY << std::endl;
+      std::cout << S_KEY << std::endl;
+      std::cout << DOWN_KEY << std::endl;
+      std::cout << UP_KEY << std::endl;
+      std::cout << LEFT_KEY << std::endl;
+      std::cout << RIGHT_KEY << std::endl << std::endl;
       std::cout << "para ler novamente passe a opção -k ou acesse a tela de controles." << std::endl;
     } break;
     case 'h':
@@ -528,58 +417,8 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  auto result = ObjLoader::load_obj(argc, argv);
-  if (result.shapes.empty()) {
-    std::cerr << "precisa de 1 shape" << std::endl;
-    exit(1);
-  }
-
-  std::vector<Vertex> verts;
-  std::vector<uint32_t> idx;
+  MeshSettings mesh_set = ObjLoader::load_obj(argc, argv);
   
-  const auto &shape = result.shapes[0];
-  const auto &indices = shape.mesh.indices;
-  const auto &p = result.attributes.positions;
-
-  for (const auto &index : indices) {
-    idx.push_back((uint32_t)index.position_index);
-  }
-
-  std::vector<Position> positions;
-  for (uint32_t i = 0; i < p.size(); i += 3){
-    Position pos = (Position){
-      .x = p[i + 0],
-      .y = p[i + 1],
-      .z = p[i + 2],
-      .w = 1.0f
-    };
-    Color color = (Color){
-      .r = 1.0f,
-      .g = 0.5f,
-      .b = 1.0f,
-      .a = 1.0f,
-    };
-    verts.push_back(
-      (Vertex){
-	.position = pos,
-	.color = color,
-      }
-    );
-  }
-  
-  MeshSettings mesh_set = (MeshSettings){
-    .obj_file = argv[1],
-    .mode = FILL_POLYGON,
-    .vertices = verts,
-    .t_verts = verts.size(),
-    .indices = idx,
-    .t_idx = idx.size(),
-    .translate = glm::vec3(0.0f),
-    .scale = glm::vec3(0.5f),
-    .angle = 0.0f,
-    .axis = glm::vec3(1.0f)
-  };
-
   std::cout << "mesh total triangles: " << mesh_set.t_idx / 3 << std::endl;
   std::cout << "mesh total idx: " << mesh_set.t_idx << std::endl;
   std::cout << "mesh total verts: " << mesh_set.t_verts << std::endl;

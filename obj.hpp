@@ -1,12 +1,12 @@
 #ifndef OBJ_H
 #define OBJ_H
 
-#include "rapidobj.hpp"
+#include "mesh.hpp"
 
 class ObjLoader
 {
 public:
-  static rapidobj::Result load_obj(int argc, char **argv);
+  static MeshSettings load_obj(int argc, char **argv);
 };
 
 
