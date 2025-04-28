@@ -26,6 +26,7 @@
 #define WIDTH 860
 #define HEIGHT 640
 
+#define EXIT_KEY "(q/esq): termina a execução do programa mesh."
 #define V_KEY "(v): troca o modo de visualização de fill para line (wireframe)."
 #define W_KEY "(w): faz deslocamento positivo em z."
 #define S_KEY "(s): faz deslocamento negativo em z."
@@ -61,12 +62,16 @@ const static char *fragment_shader_source = R"(
   out vec4 FragColor;
   void main()
   {
+     vec4 c = color * (sin(v_time) / cos(v_time));
      if (v_bord_color.w > 0.0f) {
        FragColor = v_bord_color;
+       //FragColor = mix(color, v_bord_color, 0.1f);
+       //FragColor = smoothstep(color, c, mix(color, v_bord_color, 1.0f));
      } else {
-       vec4 c = color * (sin(v_time) / cos(v_time));
-       //FragColor = vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f);
+       vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
+       //FragColor = 
        FragColor = color;
+       //FragColor = smoothstep(color, c, c1);
      }
   };
 )";
@@ -139,7 +144,7 @@ void resize_callback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, width, height);
 }
 
-glm::vec3 scale = glm::vec3(.5f);
+glm::vec3 scale = glm::vec3(1.0f);
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
   scale += (yoffset * .05f);
@@ -163,12 +168,14 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
   glm::mat4 projection = glm::mat4(1.0f);
 
+  //glm::vec3 center = glm::vec3(((float)WIDTH / 2) / WIDTH, ((float)HEIGHT / 2) / HEIGHT, 0.0f);
+
   glm::mat4 model = glm::mat4(1.0f);
   model = glm::translate(model, mesh_set.translate);
   model = glm::rotate(model, glm::radians(mesh_set.angle * time), mesh_set.axis);
   model = glm::scale(model, mesh_set.scale);
 
-  projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
+  projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
 
   int v_model = glGetUniformLocation(program, "v_model");
   int v_view = glGetUniformLocation(program, "v_view");
@@ -244,7 +251,7 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   int error = compile_shaders(&program);
   if (error != 0) exit(1);
 
-  glm::vec3 translate = glm::vec3(0.0f, 0.f, 0.f);
+  glm::vec3 translate = mesh_set.translate;
   float angle = 0.0f;
 
   uint32_t VAO, VBO, EBO;
@@ -409,6 +416,7 @@ int main(int argc, char **argv) {
     switch (argv[1][1]) {
     case 'k': {
       std::cout << "controles disponiveis: " << std::endl << std::endl;
+      std::cout << EXIT_KEY << std::endl;
       std::cout << V_KEY << std::endl;
       std::cout << W_KEY << std::endl;
       std::cout << S_KEY << std::endl;

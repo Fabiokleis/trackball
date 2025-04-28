@@ -39,8 +39,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
   }
   std::vector<Vertex> verts;
 
-  glm::mat4 model = glm::mat4(1.0f);
-  
+  uint32_t chan = 0;
   // Loop over shapes
   for (size_t s = 0; s < shapes.size(); s++) {
     // Loop over faces(polygon)
@@ -56,6 +55,10 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
 	tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
 	glm::vec4 position = glm::vec4(vx, vy, vz, 1.0f);
+	std::cout << "x: " << vx << std::endl;
+	std::cout << "y: " << vy << std::endl;
+	std::cout << "z: " << vz << std::endl;
+	std::cout << "w: " << position.w << std::endl;
 
 	// // Check if `normal_index` is zero or positive. negative = no normal data
 	// if (idx.normal_index >= 0) {
@@ -69,8 +72,13 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	//   tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
 	//   tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
 	// }
-
-	glm::vec4 color = glm::vec4(.5f, 0.5f, 1.0f, 1.0f);
+	glm::vec4 color = glm::vec4(0.5f, 0.0f, .5f, 1.0f);
+	if (chan == 1) {
+	  color = glm::vec4(.2f, .5f, 0.0f, 1.0f);
+	} else if (chan == 2) {
+	  color = glm::vec4(0.0f, 0.2f, 1.0f, 1.0f);
+	}
+	chan = (chan + 1) % 3;
 	// Optional: vertex colors
 	// if (!attrib.colors.empty()) {
 	//   tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
@@ -78,10 +86,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	//   tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
 	//   color = glm::vec4(red, green, blue, 1.0f);
 	// }
-
-	//model = glm::scale(model, mesh_set.scale);
-	
-	verts.push_back((Vertex){ .position = model * position, .color = color });
+	verts.push_back((Vertex){ .position = position, .color = color });
       }
       index_offset += fv;
 
@@ -89,6 +94,13 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
       shapes[s].mesh.material_ids[f];
     }
   }
+
+  // for (const auto &v : verts) {
+  //   std::cout << "x: " << v.position.x << std::endl;
+  //   std::cout << "y: " << v.position.y << std::endl;
+  //   std::cout << "z: " << v.position.z << std::endl;
+  //   std::cout << "w: " << v.position.w << std::endl;
+  // }
 
   MeshSettings mesh_set = (MeshSettings){
     .obj_file = argv[1],
