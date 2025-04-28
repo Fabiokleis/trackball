@@ -57,12 +57,17 @@ const static char *fragment_shader_source = R"(
   #version 330 core
   in vec4 color;
   uniform float v_time;
+  uniform vec4 v_bord_color;
   out vec4 FragColor;
   void main()
   {
-     vec4 c = color * (sin(v_time) / cos(v_time));
-     //FragColor = vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f);
-     FragColor = color;
+     if (v_bord_color.w > 0.0f) {
+       FragColor = v_bord_color;
+     } else {
+       vec4 c = color * (sin(v_time) / cos(v_time));
+       //FragColor = vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f);
+       FragColor = color;
+     }
   };
 )";
 
@@ -169,14 +174,19 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   int v_view = glGetUniformLocation(program, "v_view");
   int v_projection = glGetUniformLocation(program, "v_projection");
   int v_time = glGetUniformLocation(program, "v_time");
+  int v_bord_color = glGetUniformLocation(program, "v_bord_color");
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
   glUniformMatrix4fv(v_projection, 1, GL_FALSE, &projection[0][0]);
   glUniform1f(v_time, time);
+  glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);  
 
   glBindVertexArray(VAO);
   //glDrawElements(GL_TRIANGLES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
   //glDrawElements(GL_LINES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
+  glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);  
   glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
 }
 
@@ -262,6 +272,9 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   glBindVertexArray(0); 
 
   glEnable(GL_DEPTH_TEST);
+  glLineWidth(2.0f);
+  glEnable(GL_LINE_SMOOTH);
+  glEnable(GL_POLYGON_SMOOTH);
 
 
   float start_time = glfwGetTime();

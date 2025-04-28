@@ -1,6 +1,7 @@
 #include "obj.hpp"
 #include <vector>
 #include <iostream>
+#include <glm/ext/matrix_transform.hpp>
 
 #define TINYOBJLOADER_IMPLEMENTATION // define this in only *one* .cc
 #include "tiny_obj_loader.h"
@@ -37,6 +38,9 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     exit(1);
   }
   std::vector<Vertex> verts;
+
+  glm::mat4 model = glm::mat4(1.0f);
+  
   // Loop over shapes
   for (size_t s = 0; s < shapes.size(); s++) {
     // Loop over faces(polygon)
@@ -66,16 +70,18 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	//   tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
 	// }
 
-	glm::vec4 color = glm::vec4(1.0f, 0.5f, 1.0f, 1.0f);
+	glm::vec4 color = glm::vec4(.5f, 0.5f, 1.0f, 1.0f);
 	// Optional: vertex colors
-	if (!attrib.colors.empty()) {
-	  tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-	  tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-	  tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-	  color = glm::vec4(red, green, blue, 1.0f);
-	}
+	// if (!attrib.colors.empty()) {
+	//   tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
+	//   tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
+	//   tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
+	//   color = glm::vec4(red, green, blue, 1.0f);
+	// }
 
-	verts.push_back((Vertex){ .position = position, .color = color });
+	//model = glm::scale(model, mesh_set.scale);
+	
+	verts.push_back((Vertex){ .position = model * position, .color = color });
       }
       index_offset += fv;
 
