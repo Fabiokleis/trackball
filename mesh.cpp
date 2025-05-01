@@ -3,7 +3,6 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-
 void show_global_info() {
   ImGuiIO& io = ImGui::GetIO();
   static int location = -1;
@@ -74,15 +73,49 @@ void show_global_settings(MeshSettings *mesh_set) {
 
 void show_model_matrix(MeshSettings *mesh_set) {
   ImGuiIO& io = ImGui::GetIO(); (void) io;
-  static int menu_item = 0;
+  //static int menu_item = 0;
   ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoNav;
   ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
   
   if (ImGui::Begin("model", nullptr, window_flags)) {
     ImGui::Separator();
-    ImGui::Text("translacao (%.2f, %.2f, %.2f)", mesh_set->translate.x, mesh_set->translate.y, mesh_set->translate.z);
-    ImGui::Text("scala      (%.2f, %.2f, %.2f)", mesh_set->scale.x, mesh_set->scale.y, mesh_set->scale.z);
-    ImGui::Text("eixo       (%.1f, %.1f, %.1f)", mesh_set->axis.x, mesh_set->axis.y, mesh_set->axis.z);
+    ImGui::InputFloat3("translacao", &mesh_set->translate[0]);
+    ImGui::InputFloat3("scala", &mesh_set->scale[0]);
+    ImGui::InputFloat3("eixo", &mesh_set->axis[0]);
+    ImGui::Separator();
+    ImGui::InputFloat("stroke", &mesh_set->stroke);
+    ImGui::SliderFloat("scale factor", &mesh_set->scale_factor, 0.01f, 1.0f);
   }
+  ImGui::End();
+}
+
+void show_color_blend(MeshSettings *mesh_set) {
+  ImGuiIO& io = ImGui::GetIO(); (void) io;
+  ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
+  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+  ImGui::Begin("color blend", nullptr, window_flags);
+  ImGui::Separator();
+  ImGui::ColorEdit3("color", &mesh_set->color[0]);
+  ImGui::SliderFloat("blend factor", &mesh_set->blend, 0.0f, 1.0f);
+  ImGui::End();
+}
+
+
+void show_controls(bool *p_open) {
+  ImGuiIO& io = ImGui::GetIO(); (void) io;
+  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+  if (!ImGui::Begin("tela de controles", p_open)) {
+    ImGui::End();
+    return;
+  }
+  ImGui::BulletText("%s", EXIT_KEY);
+  ImGui::BulletText("%s", K_KEY);
+  ImGui::BulletText("%s", V_KEY);    
+  ImGui::BulletText("%s", W_KEY);
+  ImGui::BulletText("%s", S_KEY);
+  ImGui::BulletText("%s", UP_KEY);
+  ImGui::BulletText("%s", DOWN_KEY);
+  ImGui::BulletText("%s", LEFT_KEY);
+  ImGui::BulletText("%s", RIGHT_KEY);
   ImGui::End();
 }

@@ -21,23 +21,11 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#define MOUSE_ICON_FILE "mouse_icon.png"
-
-#define WIDTH 860
-#define HEIGHT 640
-
-#define EXIT_KEY "(q/esq): termina a execução do programa mesh."
-#define V_KEY "(v): troca o modo de visualização de fill para line (wireframe)."
-#define W_KEY "(w): faz deslocamento positivo em z."
-#define S_KEY "(s): faz deslocamento negativo em z."
-#define DOWN_KEY "(seta para baixo): faz deslocamento negativo em y."
-#define UP_KEY "(seta para cima): faz deslocamento postivo em y."
-#define LEFT_KEY "(seta para esquerda): faz deslocamento negativo em x."
-#define RIGHT_KEY "(seta para direita): faz deslocamento positivo em x."
-#define KEYS "para ler novamente passe a opção -k ou acesse a tela de controles."
 
 #include "mesh.hpp"
 #include "obj.hpp"
+
+MeshSettings *mesh_set;
 
 const static char *vertex_shader_source = R"(
   #version 330 core
@@ -59,7 +47,10 @@ const static char *fragment_shader_source = R"(
   in vec4 color;
   uniform float v_time;
   uniform vec4 v_bord_color;
+  uniform vec4 v_mix_color;
+  uniform float v_blend;
   out vec4 FragColor;
+
   void main()
   {
      vec4 c = color * (sin(v_time) / cos(v_time));
@@ -68,9 +59,11 @@ const static char *fragment_shader_source = R"(
        //FragColor = mix(color, v_bord_color, 0.1f);
        //FragColor = smoothstep(color, c, mix(color, v_bord_color, 1.0f));
      } else {
-       vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
-       //FragColor = 
-       FragColor = color;
+       //vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
+       vec3 c3 = color.xyz;
+       vec3 cm3 = v_mix_color.xyz;
+       FragColor = vec4(mix(c3, cm3, v_blend), 1.0f);
+
        //FragColor = smoothstep(color, c, c1);
      }
   };
@@ -144,11 +137,10 @@ void resize_callback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, width, height);
 }
 
-glm::vec3 scale = glm::vec3(1.0f);
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-  scale += (yoffset * .05f);
-  std::cout << "scale: " << glm::to_string(scale) << std::endl;
+  mesh_set->scale = mesh_set->scale + glm::vec3((yoffset * mesh_set->scale_factor));
+  std::cout << glm::to_string(mesh_set->scale) << std::endl;
 }
 
 Vec2 get_mouse_pos(GLFWwindow *window) {
@@ -168,8 +160,6 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
   glm::mat4 projection = glm::mat4(1.0f);
 
-  //glm::vec3 center = glm::vec3(((float)WIDTH / 2) / WIDTH, ((float)HEIGHT / 2) / HEIGHT, 0.0f);
-
   glm::mat4 model = glm::mat4(1.0f);
   model = glm::translate(model, mesh_set.translate);
   model = glm::rotate(model, glm::radians(mesh_set.angle * time), mesh_set.axis);
@@ -182,27 +172,30 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   int v_projection = glGetUniformLocation(program, "v_projection");
   int v_time = glGetUniformLocation(program, "v_time");
   int v_bord_color = glGetUniformLocation(program, "v_bord_color");
+  int v_mix_color = glGetUniformLocation(program, "v_mix_color");
+  int v_blend = glGetUniformLocation(program, "v_blend");
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
   glUniformMatrix4fv(v_projection, 1, GL_FALSE, &projection[0][0]);
   glUniform1f(v_time, time);
-  glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);  
+  glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
+  glUniform4f(v_mix_color, mesh_set.color[0], mesh_set.color[1], mesh_set.color[2], 1.0f);
+  glUniform1f(v_blend, mesh_set.blend);
+  glLineWidth(mesh_set.stroke);
 
   glBindVertexArray(VAO);
-  //glDrawElements(GL_TRIANGLES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
-  //glDrawElements(GL_LINES, mesh_set.t_idx, GL_UNSIGNED_INT, 0);
   glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);  
   glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
 }
 
-void loop(GLFWwindow *window, MeshSettings mesh_set) {
+void loop(GLFWwindow *window) {
 
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  
   ImGui::StyleColorsClassic();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
   ImGui_ImplOpenGL3_Init((char *)glGetString(GL_NUM_SHADING_LANGUAGE_VERSIONS));
@@ -251,22 +244,17 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   int error = compile_shaders(&program);
   if (error != 0) exit(1);
 
-  glm::vec3 translate = mesh_set.translate;
   float angle = 0.0f;
 
-  uint32_t VAO, VBO, EBO;
+  uint32_t VAO, VBO;
 
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
-  glGenBuffers(1, &EBO);
 
   glBindVertexArray(VAO);
   
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
-  glBufferData(GL_ARRAY_BUFFER, mesh_set.t_verts * sizeof(Vertex), &mesh_set.vertices[0], GL_STATIC_DRAW);
-
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_set.t_idx * sizeof(mesh_set.indices[0]), &mesh_set.indices[0], GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, mesh_set->t_verts * sizeof(Vertex), &mesh_set->vertices[0], GL_STATIC_DRAW);
   
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
   glEnableVertexAttribArray(0); // location 0
@@ -279,7 +267,7 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   glBindVertexArray(0); 
 
   glEnable(GL_DEPTH_TEST);
-  glLineWidth(2.0f);
+
   glEnable(GL_LINE_SMOOTH);
   glEnable(GL_POLYGON_SMOOTH);
 
@@ -296,6 +284,7 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
   float key_time = 0.0f;
   float key_threshold = 0.2f;
   uint32_t total_click = 0;
+  bool help = false;
   
   while (!quit) {
 
@@ -320,23 +309,17 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
 
   
     if (is_key_pressed(window, GLFW_KEY_LEFT)) {
-      translate.x -= 0.05f;
-      std::cout << "translated: " << glm::to_string(translate) << std::endl;      
+      mesh_set->translate.x -= 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_RIGHT)) {
-      translate.x += 0.05f;
-      std::cout << "translated: " << glm::to_string(translate) << std::endl;      
+      mesh_set->translate.x += 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_UP)) {
-      translate.y += 0.05f;
-      std::cout << "translated: " << glm::to_string(translate) << std::endl;      
+      mesh_set->translate.y += 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_DOWN)) {
-      translate.y -= 0.05f;
-      std::cout << "translated: " << glm::to_string(translate) << std::endl;      
+      mesh_set->translate.y -= 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_S)) {
-      translate.z -= 0.05f;
-      std::cout << "translated: " << glm::to_string(translate) << std::endl;      
+      mesh_set->translate.z -= 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_W)) {
-      translate.z += 0.05f;
-      std::cout << "translated: " << glm::to_string(translate) << std::endl;      
+      mesh_set->translate.z += 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_A)) {
       angle = ((int)angle + 5) % 360;
       std::cout << "rotated: " << angle << std::endl;      
@@ -346,11 +329,11 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
     } else if (is_key_pressed(window, GLFW_KEY_V)) {
       if (start_time - key_time > key_threshold) {
 	key_time = start_time;
-	mesh_set.mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set.mode + 1) % (WIREFRAME + 1));
+	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
       }
     }
 
-    glPolygonMode(GL_FRONT_AND_BACK, mesh_set.mode == FILL_POLYGON ? GL_FILL : GL_LINE);
+    glPolygonMode(GL_FRONT_AND_BACK, mesh_set->mode == FILL_POLYGON ? GL_FILL : GL_LINE);
 
     if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_LEFT)) {
       if (start_time - click_time > threshold) {
@@ -378,16 +361,18 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
 
     glUseProgram(program);
 
-    mesh_set.translate = translate;
-    mesh_set.scale = scale;
-    mesh_set.angle = angle;
-    //mesh_set.axis = axis;
+    mesh_set->angle = angle;
+    //mesh_set.scale = scale;
     //glBindVertexArray(VAO);
-    draw(VAO, program, mesh_set);
+    draw(VAO, program, *mesh_set);
 
     show_global_info();
-    show_global_settings(&mesh_set);
-    show_model_matrix(&mesh_set);
+    show_global_settings(mesh_set);
+    show_model_matrix(mesh_set);
+    show_color_blend(mesh_set);
+
+    if (ImGui::IsKeyPressed(ImGuiKey_K)) help = !help;
+    if (help) show_controls(&help);
     
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -403,50 +388,10 @@ void loop(GLFWwindow *window, MeshSettings mesh_set) {
 
 int main(int argc, char **argv) {
 
-  uint32_t count = 0; 
-  while(argv[++count] != NULL);
+  MeshSettings m = ObjLoader::load_obj(argc, argv);
+  mesh_set = (MeshSettings *) malloc(sizeof(MeshSettings));
+  mesh_set = &m;
   
-  if (argc != 2 || (count > 2 && argv[1][0] == '-')) {
-    std::cerr << "opção inválida, passe -h para mostrar a mensagem de help." << std::endl;
-    exit(1);
-  }
-
-
-  if (argc == 2 && (count && argv[1][0] == '-')) {
-    switch (argv[1][1]) {
-    case 'k': {
-      std::cout << "controles disponiveis: " << std::endl << std::endl;
-      std::cout << EXIT_KEY << std::endl;
-      std::cout << V_KEY << std::endl;
-      std::cout << W_KEY << std::endl;
-      std::cout << S_KEY << std::endl;
-      std::cout << DOWN_KEY << std::endl;
-      std::cout << UP_KEY << std::endl;
-      std::cout << LEFT_KEY << std::endl;
-      std::cout << RIGHT_KEY << std::endl << std::endl;
-      std::cout << "para ler novamente passe a opção -k ou acesse a tela de controles." << std::endl;
-    } break;
-    case 'h':
-    default: {
-      	  std::cout << "para executar o mesh passe um arquivo .obj: " << std::endl;
-	  std::cout << "./mesh cube.obj" << std::endl << std::endl;
-      	  std::cout << "opções: " << std::endl;
-	  std::cout << "-h: mostra essa mensagem." << std::endl;
-	  std::cout << "-k: mostra a mensagem de controles." << std::endl;
-    } break;
-    }
-    return 0;
-  }
-
-  MeshSettings mesh_set = ObjLoader::load_obj(argc, argv);
-  
-  std::cout << "mesh total triangles: " << mesh_set.t_idx / 3 << std::endl;
-  std::cout << "mesh total idx: " << mesh_set.t_idx << std::endl;
-  std::cout << "mesh total verts: " << mesh_set.t_verts << std::endl;
-  std::cout << "mesh verts size: " << sizeof(Vertex) * mesh_set.t_verts << std::endl;
-  std::cout << "mesh idx size: " << sizeof(mesh_set.indices[0]) * mesh_set.t_idx << std::endl;
- 
-
   if (!glfwInit()) {
     std::cerr << "Could not initialize glfw!" << std::endl;
     std::cerr << "error: " << strerror(errno) << std::endl;
@@ -487,7 +432,7 @@ int main(int argc, char **argv) {
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   
-  loop(window, mesh_set);
+  loop(window);
 
   glfwTerminate();
   return 0;

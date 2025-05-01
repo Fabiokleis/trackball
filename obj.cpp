@@ -7,10 +7,39 @@
 #include "tiny_obj_loader.h"
 
 MeshSettings ObjLoader::load_obj(int argc, char **argv) {
-    
-  if (argc != 2) {
-    std::cout << "passe 1 arquivo .obj como argumento." << std::endl;
+  uint32_t count = 0; 
+  while(argv[++count] != NULL);
+  
+  if (argc != 2 || (count > 2 && argv[1][0] == '-')) {
+    std::cerr << "opção inválida, passe -h para mostrar a mensagem de help." << std::endl;
     exit(1);
+  }
+
+  if (argc == 2 && (count && argv[1][0] == '-')) {
+    switch (argv[1][1]) {
+    case 'k': {
+      std::cout << "controles disponiveis: " << std::endl << std::endl;
+      std::cout << EXIT_KEY << std::endl;
+      std::cout << K_KEY << std::endl;
+      std::cout << V_KEY << std::endl;
+      std::cout << W_KEY << std::endl;
+      std::cout << S_KEY << std::endl;
+      std::cout << DOWN_KEY << std::endl;
+      std::cout << UP_KEY << std::endl;
+      std::cout << LEFT_KEY << std::endl;
+      std::cout << RIGHT_KEY << std::endl << std::endl;
+      std::cout << "para ler novamente passe a opção -k ou acesse a tela de controles." << std::endl;
+    } break;
+    case 'h':
+    default: {
+      	  std::cout << "para executar o mesh passe um arquivo .obj: " << std::endl;
+	  std::cout << "./mesh cube.obj" << std::endl << std::endl;
+      	  std::cout << "opções: " << std::endl;
+	  std::cout << "-h: mostra essa mensagem." << std::endl;
+	  std::cout << "-k: mostra a mensagem de controles." << std::endl;
+    } break;
+    }
+    exit(0);
   }
   
   tinyobj::ObjReaderConfig reader_config;
@@ -55,10 +84,10 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
 	tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
 	glm::vec4 position = glm::vec4(vx, vy, vz, 1.0f);
-	std::cout << "x: " << vx << std::endl;
-	std::cout << "y: " << vy << std::endl;
-	std::cout << "z: " << vz << std::endl;
-	std::cout << "w: " << position.w << std::endl;
+	// std::cout << "x: " << vx << std::endl;
+	// std::cout << "y: " << vy << std::endl;
+	// std::cout << "z: " << vz << std::endl;
+	// std::cout << "w: " << position.w << std::endl;
 
 	// // Check if `normal_index` is zero or positive. negative = no normal data
 	// if (idx.normal_index >= 0) {
@@ -91,7 +120,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
       index_offset += fv;
 
       // per-face material
-      shapes[s].mesh.material_ids[f];
+      //shapes[s].mesh.material_ids[f];
     }
   }
 
@@ -102,18 +131,18 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
   //   std::cout << "w: " << v.position.w << std::endl;
   // }
 
-  MeshSettings mesh_set = (MeshSettings){
+  return (MeshSettings){
     .obj_file = argv[1],
     .mode = FILL_POLYGON,
     .vertices = verts,
     .t_verts = verts.size(),
-    .indices = std::vector<uint32_t>(),
-    .t_idx = 0,
     .translate = glm::vec3(0.0f),
     .scale = glm::vec3(0.5f),
+    .scale_factor = 0.05f,
     .angle = 0.0f,
-    .axis = glm::vec3(1.0f)
+    .axis = glm::vec3(1.0f),
+    .color = glm::vec4(0.466f, 0.363f, 0.755f, 1.0f),
+    .blend = 0.5f,
+    .stroke = 1.0f
   };
-  
-  return mesh_set;
 }
