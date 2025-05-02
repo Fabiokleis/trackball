@@ -39,8 +39,8 @@ typedef struct {
   glm::vec3 translate;
   glm::vec3 scale;
   float scale_factor;
-  float angle;
-  glm::vec3 axis;
+  glm::vec2 angle;
+  //glm::vec3 axis;
   glm::vec3 color;
   float blend;
   float stroke;

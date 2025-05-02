@@ -162,7 +162,8 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
 
   glm::mat4 model = glm::mat4(1.0f);
   model = glm::translate(model, mesh_set.translate);
-  model = glm::rotate(model, glm::radians(mesh_set.angle * time), mesh_set.axis);
+  model = glm::rotate(model, glm::radians(mesh_set.angle.y), glm::vec3(1.f, 0.0f, 0.0f));
+  model = glm::rotate(model, glm::radians(mesh_set.angle.x), glm::vec3(0.f, 1.0f, 0.0f));
   model = glm::scale(model, mesh_set.scale);
 
   projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
@@ -285,6 +286,8 @@ void loop(GLFWwindow *window) {
   float key_threshold = 0.2f;
   uint32_t total_click = 0;
   bool help = false;
+
+  float vel = 0.0f;
   
   while (!quit) {
 
@@ -321,11 +324,11 @@ void loop(GLFWwindow *window) {
     } else if (is_key_pressed(window, GLFW_KEY_W)) {
       mesh_set->translate.z += 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_A)) {
-      angle = ((int)angle + 5) % 360;
-      std::cout << "rotated: " << angle << std::endl;      
+      //angle = ((int)angle + 5) % 360;
+      //std::cout << "rotated: " << angle << std::endl;      
     } else if (is_key_pressed(window, GLFW_KEY_D)) {
-      angle = ((int)angle - 5) % 360;
-      std::cout << "rotated: " << angle << std::endl;      
+      //angle = ((int)angle - 5) % 360;
+      //std::cout << "rotated: " << angle << std::endl;      
     } else if (is_key_pressed(window, GLFW_KEY_V)) {
       if (start_time - key_time > key_threshold) {
 	key_time = start_time;
@@ -336,12 +339,20 @@ void loop(GLFWwindow *window) {
     glPolygonMode(GL_FRONT_AND_BACK, mesh_set->mode == FILL_POLYGON ? GL_FILL : GL_LINE);
 
     if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_LEFT)) {
-      if (start_time - click_time > threshold) {
-	click_time = start_time;
+      //if (start_time - click_time > threshold) {
+      //click_time = start_time;
 	//glClearColor(0.99, 0.3, 0.3, 1.0);
 
+      vel += delta;
+	Vec2 mpos = get_mouse_pos(window);
+	glm::vec3 mouse = mouse_to_gl_point((float)mpos.x, (float)mpos.y);
+
+	mesh_set->angle.x = (float)mpos.x;
+	mesh_set->angle.y = (float)mpos.y;	
+	
+	std::cout << glm::to_string(mouse) << std::endl;
 	total_click++;
-      }
+	//}
 
     } else if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_RIGHT)) {
       if (start_time - click_time > threshold) {
@@ -355,13 +366,17 @@ void loop(GLFWwindow *window) {
 	//glClearColor(1.0 * (mouse_pos.x/1000.0f), 1.0 * (mouse_pos.y/1000.0f), 1.0 * (((mouse_pos.x + mouse_pos.y) / 2) / 1000.0f), 1.0);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       }
+
+      //mesh_set->angle.x = 0.0f;
+      //mesh_set->angle.y = 0.0f;
     }
+
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(program);
 
-    mesh_set->angle = angle;
+
     //mesh_set.scale = scale;
     //glBindVertexArray(VAO);
     draw(VAO, program, *mesh_set);

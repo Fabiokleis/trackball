@@ -139,8 +139,8 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     .translate = glm::vec3(0.0f),
     .scale = glm::vec3(0.5f),
     .scale_factor = 0.05f,
-    .angle = 0.0f,
-    .axis = glm::vec3(1.0f),
+    .angle = glm::vec2(0.0f, 0.0f),
+    //.axis = glm::vec3(1.0f),
     .color = glm::vec4(0.466f, 0.363f, 0.755f, 1.0f),
     .blend = 0.5f,
     .stroke = 1.0f
