@@ -133,6 +133,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 
   return (MeshSettings){
     .obj_file = argv[1],
+    .resolution = glm::vec2(WIDTH, HEIGHT),
     .mode = FILL_POLYGON,
     .vertices = verts,
     .t_verts = verts.size(),

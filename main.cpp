@@ -35,9 +35,11 @@ const static char *vertex_shader_source = R"(
   uniform mat4 v_view;
   uniform mat4 v_projection;
   out vec4 color;
+  out vec2 frag_coord;
   void main() {
      gl_Position = v_projection * v_view * v_model * v_pos;
      color = v_color;
+     frag_coord = v_pos.xy;
   };
 )";
 
@@ -45,10 +47,13 @@ const static char *vertex_shader_source = R"(
 const static char *fragment_shader_source = R"(
   #version 330 core
   in vec4 color;
+  in vec2 frag_coord;
+  uniform vec2 v_resolution;
   uniform float v_time;
   uniform vec4 v_bord_color;
   uniform vec4 v_mix_color;
   uniform float v_blend;
+
   out vec4 FragColor;
 
   void main()
@@ -62,9 +67,14 @@ const static char *fragment_shader_source = R"(
        //vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
        vec3 c3 = color.xyz;
        vec3 cm3 = v_mix_color.xyz;
-       FragColor = vec4(mix(c3, cm3, v_blend), 1.0f);
 
-       //FragColor = smoothstep(color, c, c1);
+
+       vec2 uv = frag_coord / v_resolution.xy * 2 - 1;
+       vec3 col = 0.5 + 0.5*cos(v_time+uv.xyx+vec3(0,2,4));
+       float d = length(uv);
+       //FragColor = vec4(col, 1.0f);
+
+       FragColor = vec4(mix(col, cm3, v_blend), 1.0f);
      }
   };
 )";
@@ -137,10 +147,9 @@ void resize_callback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, width, height);
 }
 
-
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
   mesh_set->scale = mesh_set->scale + glm::vec3((yoffset * mesh_set->scale_factor));
-  std::cout << glm::to_string(mesh_set->scale) << std::endl;
+  //std::cout << glm::to_string(mesh_set->scale) << std::endl;
 }
 
 Vec2 get_mouse_pos(GLFWwindow *window) {
@@ -168,6 +177,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
 
   projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
 
+  int v_resolution = glGetUniformLocation(program, "v_resolution");
   int v_model = glGetUniformLocation(program, "v_model");
   int v_view = glGetUniformLocation(program, "v_view");
   int v_projection = glGetUniformLocation(program, "v_projection");
@@ -175,9 +185,12 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   int v_bord_color = glGetUniformLocation(program, "v_bord_color");
   int v_mix_color = glGetUniformLocation(program, "v_mix_color");
   int v_blend = glGetUniformLocation(program, "v_blend");
+
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
   glUniformMatrix4fv(v_projection, 1, GL_FALSE, &projection[0][0]);
+
+  glUniform2f(v_resolution, mesh_set.resolution.x, mesh_set.resolution.y);
   glUniform1f(v_time, time);
   glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
   glUniform4f(v_mix_color, mesh_set.color[0], mesh_set.color[1], mesh_set.color[2], 1.0f);

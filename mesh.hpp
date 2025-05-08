@@ -7,8 +7,8 @@
 
 #define MOUSE_ICON_FILE "mouse_icon.png"
 
-#define WIDTH 860
-#define HEIGHT 640
+#define WIDTH 1280
+#define HEIGHT 720
 
 #define EXIT_KEY "(q/esq): termina a execução do programa mesh."
 #define V_KEY "(v): troca o modo de visualização de fill para line (wireframe)."
@@ -33,6 +33,7 @@ enum VISUALIZATION_MODE {
 
 typedef struct {
   const char *obj_file;
+  glm::vec2 resolution; 
   VISUALIZATION_MODE mode;
   std::vector<Vertex> vertices;
   uint64_t t_verts;
@@ -40,7 +41,6 @@ typedef struct {
   glm::vec3 scale;
   float scale_factor;
   glm::vec2 angle;
-  //glm::vec3 axis;
   glm::vec3 color;
   float blend;
   float stroke;
