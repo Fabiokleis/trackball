@@ -3,7 +3,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-void show_global_info() {
+void show_global_info(MeshSettings *mesh_set) {
   ImGuiIO& io = ImGui::GetIO();
   static int location = -1;
   ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav;
@@ -29,6 +29,7 @@ void show_global_info() {
   ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
   if (ImGui::Begin("info", nullptr, window_flags)) {
       ImGui::Text("%.3f ms/frame (%.1f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+      ImGui::Text("width %.1f height %.1f", mesh_set->resolution.x, mesh_set->resolution.y);
       ImGui::Separator();
       if (ImGui::IsMousePosValid())
 	ImGui::Text("Posição do mouse: (%.1f,%.1f)", io.MousePos.x, io.MousePos.y);

@@ -36,10 +36,12 @@ const static char *vertex_shader_source = R"(
   uniform mat4 v_projection;
   out vec4 color;
   out vec2 frag_coord;
+  out float v_z;
   void main() {
      gl_Position = v_projection * v_view * v_model * v_pos;
      color = v_color;
      frag_coord = v_pos.xy;
+     v_z = v_pos.z;
   };
 )";
 
@@ -48,33 +50,36 @@ const static char *fragment_shader_source = R"(
   #version 330 core
   in vec4 color;
   in vec2 frag_coord;
+  in float v_z;
   uniform vec2 v_resolution;
   uniform float v_time;
   uniform vec4 v_bord_color;
   uniform vec4 v_mix_color;
   uniform float v_blend;
+  uniform vec2 v_mouse_pos;
 
   out vec4 FragColor;
 
   void main()
   {
-     vec4 c = color * (sin(v_time) / cos(v_time));
+     vec4 c = vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f);
+     //vec2 uv = (frag_coord * 2.0 - frag_coord.xy) / frag_coord.y;
      if (v_bord_color.w > 0.0f) {
-       FragColor = v_bord_color;
-       //FragColor = mix(color, v_bord_color, 0.1f);
-       //FragColor = smoothstep(color, c, mix(color, v_bord_color, 1.0f));
+
+       //float d = length(uv);
+       //vec3 col = 0.5 + 0.5 * cos(v_time + uv.xyx + vec3(1.0f, 2.0f, 3.0f));
+       //d = sin(d * 8.0f + v_time) / 8.0f;
+       //d = abs(d);
+       //d = 0.01f / d;
+   
+       //FragColor = vec4(col, 1.0f);
+       FragColor = mix(color, c, v_blend);
      } else {
        //vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
        vec3 c3 = color.xyz;
        vec3 cm3 = v_mix_color.xyz;
 
-
-       vec2 uv = frag_coord / v_resolution.xy * 2 - 1;
-       vec3 col = 0.5 + 0.5*cos(v_time+uv.xyx+vec3(0,2,4));
-       float d = length(uv);
-       //FragColor = vec4(col, 1.0f);
-
-       FragColor = vec4(mix(col, cm3, v_blend), 1.0f);
+       FragColor = vec4(mix(c3, cm3, v_blend), 1.0f);
      }
   };
 )";
@@ -170,10 +175,12 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   glm::mat4 projection = glm::mat4(1.0f);
 
   glm::mat4 model = glm::mat4(1.0f);
-  model = glm::translate(model, mesh_set.translate);
+
+  /* T * R * S <- */
+  model = glm::scale(model, mesh_set.scale);
   model = glm::rotate(model, glm::radians(mesh_set.angle.y), glm::vec3(1.f, 0.0f, 0.0f));
   model = glm::rotate(model, glm::radians(mesh_set.angle.x), glm::vec3(0.f, 1.0f, 0.0f));
-  model = glm::scale(model, mesh_set.scale);
+  model = glm::translate(model, mesh_set.translate);
 
   projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
 
@@ -185,6 +192,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   int v_bord_color = glGetUniformLocation(program, "v_bord_color");
   int v_mix_color = glGetUniformLocation(program, "v_mix_color");
   int v_blend = glGetUniformLocation(program, "v_blend");
+  int v_mouse_pos = glGetUniformLocation(program, "v_mouse_pos");
 
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
@@ -195,6 +203,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
   glUniform4f(v_mix_color, mesh_set.color[0], mesh_set.color[1], mesh_set.color[2], 1.0f);
   glUniform1f(v_blend, mesh_set.blend);
+  glUniform2f(v_mouse_pos, mesh_set.angle.x, mesh_set.angle.y);
   glLineWidth(mesh_set.stroke);
 
   glBindVertexArray(VAO);
@@ -307,7 +316,11 @@ void loop(GLFWwindow *window) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    
+
+    show_global_info(mesh_set);
+    show_global_settings(mesh_set);
+    show_model_matrix(mesh_set);
+    show_color_blend(mesh_set);
     
     delta = glfwGetTime() - start_time;
     total_time += delta;
@@ -335,15 +348,9 @@ void loop(GLFWwindow *window) {
     } else if (is_key_pressed(window, GLFW_KEY_S)) {
       mesh_set->translate.z -= 0.05f;
     } else if (is_key_pressed(window, GLFW_KEY_W)) {
-      mesh_set->translate.z += 0.05f;
-    } else if (is_key_pressed(window, GLFW_KEY_A)) {
-      //angle = ((int)angle + 5) % 360;
-      //std::cout << "rotated: " << angle << std::endl;      
-    } else if (is_key_pressed(window, GLFW_KEY_D)) {
-      //angle = ((int)angle - 5) % 360;
-      //std::cout << "rotated: " << angle << std::endl;      
+      mesh_set->translate.z += 0.05f;    
     } else if (is_key_pressed(window, GLFW_KEY_V)) {
-      if (start_time - key_time > key_threshold) {
+      if (start_time - key_time > key_threshold) { // debounce
 	key_time = start_time;
 	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
       }
@@ -355,16 +362,16 @@ void loop(GLFWwindow *window) {
       //if (start_time - click_time > threshold) {
       //click_time = start_time;
 	//glClearColor(0.99, 0.3, 0.3, 1.0);
-
-      vel += delta;
+      if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemActive()) {
+	vel += delta;
 	Vec2 mpos = get_mouse_pos(window);
 	glm::vec3 mouse = mouse_to_gl_point((float)mpos.x, (float)mpos.y);
-
 	mesh_set->angle.x = (float)mpos.x;
 	mesh_set->angle.y = (float)mpos.y;	
 	
 	std::cout << glm::to_string(mouse) << std::endl;
 	total_click++;
+      }
 	//}
 
     } else if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_RIGHT)) {
@@ -386,18 +393,9 @@ void loop(GLFWwindow *window) {
 
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     glUseProgram(program);
-
-
-    //mesh_set.scale = scale;
-    //glBindVertexArray(VAO);
     draw(VAO, program, *mesh_set);
 
-    show_global_info();
-    show_global_settings(mesh_set);
-    show_model_matrix(mesh_set);
-    show_color_blend(mesh_set);
 
     if (ImGui::IsKeyPressed(ImGuiKey_K)) help = !help;
     if (help) show_controls(&help);

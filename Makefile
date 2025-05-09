@@ -7,7 +7,7 @@ SOURCES += $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui
 OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 
 CXXFLAGS = -std=c++11 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -g -Wall -Wformat $(pkg-config --cflags glfw3)
-LIBS = -pthread -lglfw -lGLEW -lGL -lm
+LIBS = -lglfw -lGLEW -lGL -lm
 
 ECHO_MESSAGE = "linux compiled $(EXE)"
 

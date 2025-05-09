@@ -46,9 +46,10 @@ typedef struct {
   float stroke;
 } MeshSettings;
 
-void show_global_info();
+void show_global_info(MeshSettings *mesh_set);
 void show_global_settings(MeshSettings *mesh_set);
 void show_model_matrix(MeshSettings *mesh_set);
 void show_color_blend(MeshSettings *mesh_set);
 void show_controls(bool *p_open);
+
 #endif /* MESH_H */

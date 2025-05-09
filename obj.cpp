@@ -1,7 +1,11 @@
 #include "obj.hpp"
 #include <vector>
 #include <iostream>
+
+#include <glm/gtx/string_cast.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <float.h>
+
 
 #define TINYOBJLOADER_IMPLEMENTATION // define this in only *one* .cc
 #include "tiny_obj_loader.h"
@@ -66,41 +70,41 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     std::cout << "precisa de pelo menos 1 shape." << std::endl;
     exit(1);
   }
+
+  float min_x = FLT_MAX;
+  float max_x = FLT_MIN;
+  float min_y = FLT_MAX;
+  float max_y = FLT_MIN;
+  float min_z = FLT_MAX;
+  float max_z = FLT_MIN;
+
   std::vector<Vertex> verts;
 
   uint32_t chan = 0;
   // Loop over shapes
-  for (size_t s = 0; s < shapes.size(); s++) {
+  for (uint32_t s = 0; s < shapes.size(); s++) {
     // Loop over faces(polygon)
-    size_t index_offset = 0;
-    for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-      size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+    uint32_t index_offset = 0;
+    for (uint32_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+      uint32_t fv = (uint32_t)(shapes[s].mesh.num_face_vertices[f]);
 
       // Loop over vertices in the face.
-      for (size_t v = 0; v < fv; v++) {
+      for (uint32_t v = 0; v < fv; v++) {
 	// access to vertex
 	tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-	tinyobj::real_t vx = attrib.vertices[3*size_t(idx.vertex_index)+0];
-	tinyobj::real_t vy = attrib.vertices[3*size_t(idx.vertex_index)+1];
-	tinyobj::real_t vz = attrib.vertices[3*size_t(idx.vertex_index)+2];
+	tinyobj::real_t vx = attrib.vertices[3*(uint32_t)(idx.vertex_index)+0];
+	tinyobj::real_t vy = attrib.vertices[3*(uint32_t)(idx.vertex_index)+1];
+	tinyobj::real_t vz = attrib.vertices[3*(uint32_t)(idx.vertex_index)+2];
+
+	min_x = std::min(min_x, vx);
+	max_x = std::max(max_x, vx);
+	min_y = std::min(min_y, vy);
+	max_y = std::max(max_y, vy);
+	min_z = std::min(min_z, vz);
+	max_z = std::max(max_z, vz);
+	
 	glm::vec4 position = glm::vec4(vx, vy, vz, 1.0f);
-	// std::cout << "x: " << vx << std::endl;
-	// std::cout << "y: " << vy << std::endl;
-	// std::cout << "z: " << vz << std::endl;
-	// std::cout << "w: " << position.w << std::endl;
 
-	// // Check if `normal_index` is zero or positive. negative = no normal data
-	// if (idx.normal_index >= 0) {
-	//   tinyobj::real_t nx = attrib.normals[3*size_t(idx.normal_index)+0];
-	//   tinyobj::real_t ny = attrib.normals[3*size_t(idx.normal_index)+1];
-	//   tinyobj::real_t nz = attrib.normals[3*size_t(idx.normal_index)+2];
-	// }
-
-	// // Check if `texcoord_index` is zero or positive. negative = no texcoord data
-	// if (idx.texcoord_index >= 0) {
-	//   tinyobj::real_t tx = attrib.texcoords[2*size_t(idx.texcoord_index)+0];
-	//   tinyobj::real_t ty = attrib.texcoords[2*size_t(idx.texcoord_index)+1];
-	// }
 	glm::vec4 color = glm::vec4(0.5f, 0.0f, .5f, 1.0f);
 	if (chan == 1) {
 	  color = glm::vec4(.2f, .5f, 0.0f, 1.0f);
@@ -108,13 +112,6 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	  color = glm::vec4(0.0f, 0.2f, 1.0f, 1.0f);
 	}
 	chan = (chan + 1) % 3;
-	// Optional: vertex colors
-	// if (!attrib.colors.empty()) {
-	//   tinyobj::real_t red   = attrib.colors[3*size_t(idx.vertex_index)+0];
-	//   tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
-	//   tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
-	//   color = glm::vec4(red, green, blue, 1.0f);
-	// }
 	verts.push_back((Vertex){ .position = position, .color = color });
       }
       index_offset += fv;
@@ -124,24 +121,30 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     }
   }
 
-  // for (const auto &v : verts) {
-  //   std::cout << "x: " << v.position.x << std::endl;
-  //   std::cout << "y: " << v.position.y << std::endl;
-  //   std::cout << "z: " << v.position.z << std::endl;
-  //   std::cout << "w: " << v.position.w << std::endl;
-  // }
+  glm::vec3 center = glm::vec3(0.0f);
 
+  center.x = (min_x + max_x) / 2.0f;
+  center.y = (min_y + max_y) / 2.0f;
+  center.z = (min_z + max_z) / 2.0f;
+
+  float tam_x = max_x - min_x;
+  float tam_y = max_y - min_y;
+  float tam_z = max_z - min_z;
+
+  float maior_dim = std::max(std::max(tam_x, tam_y), tam_z);
+  
+  float escala = 2.0f / maior_dim;
+  
   return (MeshSettings){
     .obj_file = argv[1],
     .resolution = glm::vec2(WIDTH, HEIGHT),
     .mode = FILL_POLYGON,
     .vertices = verts,
     .t_verts = verts.size(),
-    .translate = glm::vec3(0.0f),
-    .scale = glm::vec3(0.5f),
-    .scale_factor = 0.05f,
+    .translate = -center,
+    .scale = glm::vec3(escala),
+    .scale_factor = 0.01f,
     .angle = glm::vec2(0.0f, 0.0f),
-    //.axis = glm::vec3(1.0f),
     .color = glm::vec4(0.466f, 0.363f, 0.755f, 1.0f),
     .blend = 0.5f,
     .stroke = 1.0f
