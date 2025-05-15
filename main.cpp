@@ -176,11 +176,12 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
 
   glm::mat4 model = glm::mat4(1.0f);
 
-  /* T * R * S <- */
-  model = glm::scale(model, mesh_set.scale);
+  /* T * R * S * T <- */
+  model = glm::translate(model, mesh_set.translate);
   model = glm::rotate(model, glm::radians(mesh_set.angle.y), glm::vec3(1.f, 0.0f, 0.0f));
   model = glm::rotate(model, glm::radians(mesh_set.angle.x), glm::vec3(0.f, 1.0f, 0.0f));
-  model = glm::translate(model, mesh_set.translate);
+  model = glm::scale(model, mesh_set.scale);
+  model = glm::translate(model, -mesh_set.center);
 
   projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
 
@@ -266,8 +267,6 @@ void loop(GLFWwindow *window) {
   uint32_t program;
   int error = compile_shaders(&program);
   if (error != 0) exit(1);
-
-  float angle = 0.0f;
 
   uint32_t VAO, VBO;
 

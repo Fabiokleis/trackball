@@ -37,6 +37,7 @@ typedef struct {
   VISUALIZATION_MODE mode;
   std::vector<Vertex> vertices;
   uint64_t t_verts;
+  glm::vec3 center;
   glm::vec3 translate;
   glm::vec3 scale;
   float scale_factor;
