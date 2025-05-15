@@ -178,8 +178,11 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
 
   /* T * R * S * T <- */
   model = glm::translate(model, mesh_set.translate);
-  model = glm::rotate(model, glm::radians(mesh_set.angle.y), glm::vec3(1.f, 0.0f, 0.0f));
-  model = glm::rotate(model, glm::radians(mesh_set.angle.x), glm::vec3(0.f, 1.0f, 0.0f));
+  //model = glm::rotate(model, glm::radians(mesh_set.angle.y), glm::vec3(1.f, 0.0f, 0.0f));
+  //model = glm::rotate(model, glm::radians(mesh_set.angle.x), glm::vec3(0.f, 1.0f, 0.0f));
+  glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+  rotation =  glm::angleAxis(glm::radians(mesh_set.angle.y), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::angleAxis(glm::radians(mesh_set.angle.x), glm::vec3(0.0f, 1.0f, 0.0f)) * rotation;
+  model = model * glm::mat4_cast(rotation);
   model = glm::scale(model, mesh_set.scale);
   model = glm::translate(model, -mesh_set.center);
 
