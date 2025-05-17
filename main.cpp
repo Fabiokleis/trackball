@@ -134,13 +134,18 @@ typedef struct {
 } Vec2;
 
 bool is_key_pressed(GLFWwindow *window, int keycode) {
-    int state = glfwGetKey(window, keycode);
-    return state == GLFW_PRESS || state == GLFW_REPEAT;
+  int state = glfwGetKey(window, keycode);
+  return state == GLFW_PRESS || state == GLFW_REPEAT;
 }
 
 bool is_mouse_button_pressed(GLFWwindow *window, int button) {
-    int state = glfwGetMouseButton(window, button);
-    return state == GLFW_PRESS;
+  int state = glfwGetMouseButton(window, button);
+  return state == GLFW_PRESS;
+}
+
+bool is_mouse_button_released(GLFWwindow *window, int button) {
+  int state = glfwGetMouseButton(window, button);
+  return state == GLFW_RELEASE;
 }
 
 bool should_quit(GLFWwindow *window) {
@@ -157,34 +162,67 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
   //std::cout << glm::to_string(mesh_set->scale) << std::endl;
 }
 
-Vec2 get_mouse_pos(GLFWwindow *window) {
+glm::vec2 get_mouse_pos(GLFWwindow *window) {
     double xpos, ypos;
     glfwGetCursorPos(window, &xpos, &ypos);
 
-    return Vec2{ .x = xpos, .y = ypos };
+    return glm::vec2(xpos, ypos);
 }
 // mouse offset 1 -1
 glm::vec3 mouse_to_gl_point(float x, float y) {
   return glm::vec3((2.0f * x) / WIDTH - 1.0f, 1.0f - (2.0f * y) / HEIGHT, 0.0f);
 }
 
-void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
+glm::vec3 mouse_to_trackball(glm::vec2 pos) {
+  glm::vec2 gl_pos = mouse_to_gl_point(pos.x, pos.y);
+  // x2 + y2 + z2 = 1  -> z2 = 1 − x2 −y2
+  float z1 = 1.0f - gl_pos.x * gl_pos.x - gl_pos.y * gl_pos.y;    
+  float z = z1 > 0 ? z1 : 0;
+  return glm::normalize(glm::vec3(gl_pos.x, gl_pos.y, z));
+}
+
+glm::quat rotation_calc(glm::vec2 l_mouse_pos, glm::vec2 c_mouse_pos) {
+  glm::vec3 n_l_pos = mouse_to_trackball(l_mouse_pos);
+  glm::vec3 n_c_pos = mouse_to_trackball(c_mouse_pos);
+  
+  glm::vec3 axis = glm::cross(n_l_pos, n_c_pos);
+  float dot = glm::dot(n_l_pos, n_c_pos);
+  float angle = acos(glm::clamp(dot, -1.0f, 1.0f));
+  
+  if (glm::length(axis) < 0.00001f || angle < 0.00001f) {
+    return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+  }
+  
+  //float distance = glm::length(c_mouse_pos - l_mouse_pos);
+  //float speed = .1f * distance;
+  
+  return glm::angleAxis(angle, glm::normalize(axis));
+}
+
+void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mouse_pos) {
   float time = (float)glfwGetTime();
   glm::mat4 view = glm::mat4(1.0f);
-  view = glm::translate(view, glm::vec3(0.0f, 0.0f, -3.0f));
+  view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), 
+		     glm::vec3(0.0f, 0.0f, 0.0f), 
+		     glm::vec3(0.0f, 1.0f, 0.0f));
+  
   glm::mat4 projection = glm::mat4(1.0f);
 
   glm::mat4 model = glm::mat4(1.0f);
 
   /* T * R * S * T <- */
-  model = glm::translate(model, mesh_set.translate);
-  //model = glm::rotate(model, glm::radians(mesh_set.angle.y), glm::vec3(1.f, 0.0f, 0.0f));
-  //model = glm::rotate(model, glm::radians(mesh_set.angle.x), glm::vec3(0.f, 1.0f, 0.0f));
-  glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
-  rotation =  glm::angleAxis(glm::radians(mesh_set.angle.y), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::angleAxis(glm::radians(mesh_set.angle.x), glm::vec3(0.0f, 1.0f, 0.0f)) * rotation;
-  model = model * glm::mat4_cast(rotation);
-  model = glm::scale(model, mesh_set.scale);
-  model = glm::translate(model, -mesh_set.center);
+  model = glm::translate(model, mesh_set->translate);
+
+  if (mesh_set->rotating) {
+    glm::quat delta = rotation_calc(mesh_set->mouse_pos, c_mouse_pos);
+    mesh_set->rotation = glm::normalize(delta * mesh_set->rotation);
+    mesh_set->mouse_pos = c_mouse_pos;
+    glm::to_string(mesh_set->rotation);
+  }
+  
+  model = model * glm::mat4_cast(mesh_set->rotation);
+  model = glm::scale(model, mesh_set->scale);
+  model = glm::translate(model, -mesh_set->center);
 
   projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
 
@@ -202,19 +240,19 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings mesh_set) {
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
   glUniformMatrix4fv(v_projection, 1, GL_FALSE, &projection[0][0]);
 
-  glUniform2f(v_resolution, mesh_set.resolution.x, mesh_set.resolution.y);
+  glUniform2f(v_resolution, mesh_set->resolution.x, mesh_set->resolution.y);
   glUniform1f(v_time, time);
   glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
-  glUniform4f(v_mix_color, mesh_set.color[0], mesh_set.color[1], mesh_set.color[2], 1.0f);
-  glUniform1f(v_blend, mesh_set.blend);
-  glUniform2f(v_mouse_pos, mesh_set.angle.x, mesh_set.angle.y);
-  glLineWidth(mesh_set.stroke);
+  glUniform4f(v_mix_color, mesh_set->color[0], mesh_set->color[1], mesh_set->color[2], 1.0f);
+  glUniform1f(v_blend, mesh_set->blend);
+  glUniform2f(v_mouse_pos, mesh_set->angle.x, mesh_set->angle.y);
+  glLineWidth(mesh_set->stroke);
 
   glBindVertexArray(VAO);
-  glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
+  glDrawArrays(GL_TRIANGLES, 0, mesh_set->t_verts);
   glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
   glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);  
-  glDrawArrays(GL_TRIANGLES, 0, mesh_set.t_verts);
+  glDrawArrays(GL_TRIANGLES, 0, mesh_set->t_verts);
 }
 
 void loop(GLFWwindow *window) {
@@ -231,7 +269,6 @@ void loop(GLFWwindow *window) {
   
   int width = 0;
   int height = 0;
-  Vec2 mouse_pos = {0};
 
   int m_width = 0;
   int m_height = 0;
@@ -310,8 +347,6 @@ void loop(GLFWwindow *window) {
   float key_threshold = 0.2f;
   uint32_t total_click = 0;
   bool help = false;
-
-  float vel = 0.0f;
   
   while (!quit) {
 
@@ -336,8 +371,6 @@ void loop(GLFWwindow *window) {
     quit = should_quit(window);
     //glfwSwapInterval(1);
     glfwGetWindowSize(window, &width, &height);
-    mouse_pos = get_mouse_pos(window);
-
   
     if (is_key_pressed(window, GLFW_KEY_LEFT)) {
       mesh_set->translate.x -= 0.05f;
@@ -361,28 +394,25 @@ void loop(GLFWwindow *window) {
     glPolygonMode(GL_FRONT_AND_BACK, mesh_set->mode == FILL_POLYGON ? GL_FILL : GL_LINE);
 
     if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_LEFT)) {
-      //if (start_time - click_time > threshold) {
-      //click_time = start_time;
-	//glClearColor(0.99, 0.3, 0.3, 1.0);
-      if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemActive()) {
-	vel += delta;
-	Vec2 mpos = get_mouse_pos(window);
-	glm::vec3 mouse = mouse_to_gl_point((float)mpos.x, (float)mpos.y);
-	mesh_set->angle.x = (float)mpos.x;
-	mesh_set->angle.y = (float)mpos.y;	
-	
-	std::cout << glm::to_string(mouse) << std::endl;
-	total_click++;
+      if (start_time - click_time > threshold) {
+        click_time = start_time;
+	 //glClearColor(0.99, 0.3, 0.3, 1.0);
+        if (!ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemActive()) {
+	  mesh_set->rotating = true;
+	  mesh_set->mouse_pos = get_mouse_pos(window);
+	  //std::cout << glm::to_string(mesh_set->mouse_pos) << std::endl;
+	  total_click++;
+        }
       }
-	//}
 
+    } else if (is_mouse_button_released(window, GLFW_MOUSE_BUTTON_LEFT)) {
+      mesh_set->rotating = false;
     } else if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_RIGHT)) {
       if (start_time - click_time > threshold) {
 	click_time = start_time;
 	total_click++;
       }
-    }
-    else {
+    } else {
       // draw
       {
 	//glClearColor(1.0 * (mouse_pos.x/1000.0f), 1.0 * (mouse_pos.y/1000.0f), 1.0 * (((mouse_pos.x + mouse_pos.y) / 2) / 1000.0f), 1.0);
@@ -396,8 +426,7 @@ void loop(GLFWwindow *window) {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(program);
-    draw(VAO, program, *mesh_set);
-
+    draw(VAO, program, mesh_set, get_mouse_pos(window));
 
     if (ImGui::IsKeyPressed(ImGuiKey_K)) help = !help;
     if (help) show_controls(&help);

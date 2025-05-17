@@ -2,7 +2,7 @@
 #define MESH_H
 
 #include <glm/glm.hpp>
-
+#include <glm/gtc/quaternion.hpp>
 #include <vector>
 
 #define MOUSE_ICON_FILE "mouse_icon.png"
@@ -38,6 +38,9 @@ typedef struct {
   std::vector<Vertex> vertices;
   uint64_t t_verts;
   glm::vec3 center;
+  glm::vec2 mouse_pos;
+  bool rotating;
+  glm::quat rotation;
   glm::vec3 translate;
   glm::vec3 scale;
   float scale_factor;

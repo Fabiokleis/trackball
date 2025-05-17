@@ -82,7 +82,6 @@ void show_model_matrix(MeshSettings *mesh_set) {
     ImGui::Separator();
     ImGui::InputFloat3("translacao", &mesh_set->translate[0]);
     ImGui::InputFloat3("scala", &mesh_set->scale[0]);
-    //ImGui::InputFloat3("eixo", &mesh_set->axis[0]);
     ImGui::Separator();
     ImGui::InputFloat("stroke", &mesh_set->stroke);
     ImGui::SliderFloat("scale factor", &mesh_set->scale_factor, 0.01f, 1.0f);
