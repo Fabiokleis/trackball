@@ -5,11 +5,11 @@
 #include <chrono>
 #include <thread>
 
-#define GLM_ENABLE_EXPERIMENTAL
+//#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/mat4x4.hpp> // glm::mat4
 #include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
 #include <glm/glm.hpp>
-#include <glm/gtx/string_cast.hpp>
+//#include <glm/gtx/string_cast.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -192,10 +192,7 @@ glm::quat rotation_calc(glm::vec2 l_mouse_pos, glm::vec2 c_mouse_pos) {
   if (glm::length(axis) < 0.00001f || angle < 0.00001f) {
     return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
   }
-  
-  //float distance = glm::length(c_mouse_pos - l_mouse_pos);
-  //float speed = .1f * distance;
-  
+
   return glm::angleAxis(angle, glm::normalize(axis));
 }
 
@@ -207,7 +204,6 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
 		     glm::vec3(0.0f, 1.0f, 0.0f));
   
   glm::mat4 projection = glm::mat4(1.0f);
-
   glm::mat4 model = glm::mat4(1.0f);
 
   /* T * R * S * T <- */
@@ -217,14 +213,13 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
     glm::quat delta = rotation_calc(mesh_set->mouse_pos, c_mouse_pos);
     mesh_set->rotation = glm::normalize(delta * mesh_set->rotation);
     mesh_set->mouse_pos = c_mouse_pos;
-    glm::to_string(mesh_set->rotation);
   }
   
   model = model * glm::mat4_cast(mesh_set->rotation);
   model = glm::scale(model, mesh_set->scale);
   model = glm::translate(model, -mesh_set->center);
 
-  projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f); // glm::ortho(0.0f, (float)WIDTH, 0.0f, (float)HEIGHT, 0.1f, 100.0f);
+  projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
 
   int v_resolution = glGetUniformLocation(program, "v_resolution");
   int v_model = glGetUniformLocation(program, "v_model");
@@ -234,7 +229,6 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   int v_bord_color = glGetUniformLocation(program, "v_bord_color");
   int v_mix_color = glGetUniformLocation(program, "v_mix_color");
   int v_blend = glGetUniformLocation(program, "v_blend");
-  int v_mouse_pos = glGetUniformLocation(program, "v_mouse_pos");
 
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
@@ -245,7 +239,6 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
   glUniform4f(v_mix_color, mesh_set->color[0], mesh_set->color[1], mesh_set->color[2], 1.0f);
   glUniform1f(v_blend, mesh_set->blend);
-  glUniform2f(v_mouse_pos, mesh_set->angle.x, mesh_set->angle.y);
   glLineWidth(mesh_set->stroke);
 
   glBindVertexArray(VAO);
@@ -259,7 +252,7 @@ void loop(GLFWwindow *window) {
 
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange | ImGuiConfigFlags_NavEnableKeyboard;
   
   ImGui::StyleColorsClassic();
   ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -419,8 +412,6 @@ void loop(GLFWwindow *window) {
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       }
 
-      //mesh_set->angle.x = 0.0f;
-      //mesh_set->angle.y = 0.0f;
     }
 
 

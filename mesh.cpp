@@ -80,6 +80,7 @@ void show_model_matrix(MeshSettings *mesh_set) {
   
   if (ImGui::Begin("model", nullptr, window_flags)) {
     ImGui::Separator();
+    ImGui::InputFloat3("center", &mesh_set->center[0]);
     ImGui::InputFloat3("translacao", &mesh_set->translate[0]);
     ImGui::InputFloat3("scala", &mesh_set->scale[0]);
     ImGui::Separator();

@@ -2,7 +2,7 @@
 #include <vector>
 #include <iostream>
 
-#include <glm/gtx/string_cast.hpp>
+//#include <glm/gtx/string_cast.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <float.h>
 
@@ -133,7 +133,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 
   float maior_dim = std::max(std::max(tam_x, tam_y), tam_z);
   
-  float escala = 2.0f / maior_dim;
+  float escala = 1.0f / maior_dim;
   
   return (MeshSettings){
     .obj_file = argv[1],
@@ -148,7 +148,6 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     .translate = glm::vec3(0.0f),
     .scale = glm::vec3(escala),
     .scale_factor = 0.01f,
-    .angle = glm::vec2(0.0f, 0.0f),
     .color = glm::vec4(0.466f, 0.363f, 0.755f, 1.0f),
     .blend = 0.5f,
     .stroke = 1.0f
