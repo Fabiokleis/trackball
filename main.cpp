@@ -30,17 +30,22 @@ MeshSettings *mesh_set;
 const static char *vertex_shader_source = R"(
   #version 330 core
   layout (location = 0) in vec4 v_pos;
-  layout (location = 1) in vec4 v_color;
+  layout (location = 1) in vec3 v_normal;
+  layout (location = 2) in vec4 v_color;
   uniform mat4 v_model;
   uniform mat4 v_view;
   uniform mat4 v_projection;
   out vec4 color;
   out vec2 frag_coord;
   out float v_z;
+  out vec3 normal;
+  out vec3 frag_pos;
   void main() {
      gl_Position = v_projection * v_view * v_model * v_pos;
      color = v_color;
+     normal = mat3(transpose(inverse(v_model))) * v_normal;
      frag_coord = v_pos.xy;
+     frag_pos = vec3(v_model * v_pos);
      v_z = v_pos.z;
   };
 )";
@@ -49,6 +54,8 @@ const static char *vertex_shader_source = R"(
 const static char *fragment_shader_source = R"(
   #version 330 core
   in vec4 color;
+  in vec3 normal;
+  in vec3 frag_pos;
   in vec2 frag_coord;
   in float v_z;
   uniform vec2 v_resolution;
@@ -58,11 +65,32 @@ const static char *fragment_shader_source = R"(
   uniform float v_blend;
   uniform vec2 v_mouse_pos;
 
+  uniform vec3 v_camera_position;
+  uniform vec3 v_light_position;
+  uniform vec3 v_light_color;
+  uniform float v_ka;
+  uniform float v_kd;
+  uniform float v_ks;
+
   out vec4 FragColor;
 
   void main()
   {
-     vec4 c = vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f);
+     vec3 ambient = v_ka * v_light_color;
+
+     vec3 l = normalize(v_light_position - frag_pos);
+     float diff = max(dot(normal, l), 0.0);
+     vec3 diffuse = v_kd * diff * v_light_color;
+
+     vec3 v = normalize(v_camera_position - frag_pos);
+     vec3 r = reflect(-l, normal);
+     float spec = pow(max(dot(v, r), 0.0), 3.0);
+     vec3 specular = v_ks * spec * v_light_color;
+
+     vec4 light = vec4(ambient + diffuse + specular, 1.0f);
+
+     vec4 c = light * vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f);
+
      //vec2 uv = (frag_coord * 2.0 - frag_coord.xy) / frag_coord.y;
      if (v_bord_color.w > 0.0f) {
 
@@ -78,8 +106,7 @@ const static char *fragment_shader_source = R"(
        //vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
        vec3 c3 = color.xyz;
        vec3 cm3 = v_mix_color.xyz;
-
-       FragColor = vec4(mix(c3, cm3, v_blend), 1.0f);
+       FragColor = light * vec4(mix(c3, cm3, v_blend), 1.0f);
      }
   };
 )";
@@ -128,10 +155,6 @@ int compile_shaders(uint32_t *shader_program) {
   glDeleteShader(fragment_shader);
   return 0;
 }
-
-typedef struct {
-  double x, y;
-} Vec2;
 
 bool is_key_pressed(GLFWwindow *window, int keycode) {
   int state = glfwGetKey(window, keycode);
@@ -229,6 +252,12 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   int v_bord_color = glGetUniformLocation(program, "v_bord_color");
   int v_mix_color = glGetUniformLocation(program, "v_mix_color");
   int v_blend = glGetUniformLocation(program, "v_blend");
+  int v_camera_position = glGetUniformLocation(program , "v_camera_position");
+  int v_light_position = glGetUniformLocation(program , "v_light_position");
+  int v_light_color = glGetUniformLocation(program , "v_light_color");
+  int v_ka = glGetUniformLocation(program , "v_ka");
+  int v_kd = glGetUniformLocation(program , "v_kd");
+  int v_ks = glGetUniformLocation(program , "v_ks");
 
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
@@ -238,7 +267,13 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   glUniform1f(v_time, time);
   glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
   glUniform4f(v_mix_color, mesh_set->color[0], mesh_set->color[1], mesh_set->color[2], 1.0f);
+  glUniform3f(v_camera_position, mesh_set->camera_position[0], mesh_set->camera_position[1], mesh_set->camera_position[2]);
+  glUniform3f(v_light_position, mesh_set->light_position[0], mesh_set->light_position[1], mesh_set->light_position[2]);
+  glUniform3f(v_light_color, mesh_set->light_color[0], mesh_set->light_color[1], mesh_set->light_color[2]);
   glUniform1f(v_blend, mesh_set->blend);
+  glUniform1f(v_ka, mesh_set->ka);
+  glUniform1f(v_kd, mesh_set->kd);
+  glUniform1f(v_ks, mesh_set->ks);
   glLineWidth(mesh_set->stroke);
 
   glBindVertexArray(VAO);
@@ -314,8 +349,11 @@ void loop(GLFWwindow *window) {
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
   glEnableVertexAttribArray(0); // location 0
 
-  glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+  glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, normal));
   glEnableVertexAttribArray(1); // location 1
+
+  glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, color));
+  glEnableVertexAttribArray(2); // location 1
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
@@ -350,7 +388,7 @@ void loop(GLFWwindow *window) {
     show_global_info(mesh_set);
     show_global_settings(mesh_set);
     show_model_matrix(mesh_set);
-    show_color_blend(mesh_set);
+    show_lightning(mesh_set);
     
     delta = glfwGetTime() - start_time;
     total_time += delta;

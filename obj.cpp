@@ -2,7 +2,9 @@
 #include <vector>
 #include <iostream>
 
-//#include <glm/gtx/string_cast.hpp>
+#include <glm/ext/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale
+#include <glm/glm.hpp>
+#include <glm/gtx/string_cast.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <float.h>
 
@@ -90,12 +92,14 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 
       // Loop over vertices in the face.
       for (uint32_t v = 0; v < fv; v++) {
+
 	// access to vertex
 	tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+
 	tinyobj::real_t vx = attrib.vertices[3*(uint32_t)(idx.vertex_index)+0];
 	tinyobj::real_t vy = attrib.vertices[3*(uint32_t)(idx.vertex_index)+1];
 	tinyobj::real_t vz = attrib.vertices[3*(uint32_t)(idx.vertex_index)+2];
-
+	
 	min_x = std::min(min_x, vx);
 	max_x = std::max(max_x, vx);
 	min_y = std::min(min_y, vy);
@@ -105,6 +109,8 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	
 	glm::vec4 position = glm::vec4(vx, vy, vz, 1.0f);
 
+	glm::vec3 normal = glm::vec3(0.f);
+	
 	glm::vec4 color = glm::vec4(0.5f, 0.0f, .5f, 1.0f);
 	if (chan == 1) {
 	  color = glm::vec4(.2f, .5f, 0.0f, 1.0f);
@@ -112,7 +118,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
 	  color = glm::vec4(0.0f, 0.2f, 1.0f, 1.0f);
 	}
 	chan = (chan + 1) % 3;
-	verts.push_back((Vertex){ .position = position, .color = color });
+	verts.push_back((Vertex){ .position = position, .normal = normal, .color = color });
       }
       index_offset += fv;
 
@@ -121,6 +127,19 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     }
   }
 
+  // calculate triangle normal
+  for (uint32_t i = 0; i < verts.size(); i += 3) {
+    glm::vec3 p1 = glm::vec3(verts[i+0].position.x, verts[i+0].position.y, verts[i+0].position.z);
+    glm::vec3 p2 = glm::vec3(verts[i+1].position.x, verts[i+1].position.y, verts[i+1].position.z);
+    glm::vec3 p3 = glm::vec3(verts[i+2].position.x, verts[i+2].position.y, verts[i+2].position.z);
+    glm::vec3 normal = glm::normalize(glm::cross(p2 - p1, p3 - p1));
+    verts[i+0].normal = normal;
+    verts[i+1].normal = normal;
+    verts[i+2].normal = normal;
+
+    //std::cout << glm::to_string(normal) << std::endl;
+  }
+  
   glm::vec3 center = glm::vec3(0.0f);
 
   center.x = (min_x + max_x) / 2.0f;
@@ -150,6 +169,12 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     .scale_factor = 0.01f,
     .color = glm::vec4(0.466f, 0.363f, 0.755f, 1.0f),
     .blend = 0.5f,
-    .stroke = 1.0f
+    .stroke = 1.0f,
+    .camera_position = glm::vec3(0.0f),
+    .light_position = glm::vec3(1.0f, 0.0f, 2.0f),
+    .light_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+    .ka = 0.5f,
+    .kd = 0.8f,
+    .ks = 1.0f,
   };
 }

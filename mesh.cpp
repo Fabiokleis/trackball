@@ -1,5 +1,5 @@
 #include "mesh.hpp"
-#include "imgui.h"
+#include "./dependencies/imgui/imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
@@ -90,17 +90,24 @@ void show_model_matrix(MeshSettings *mesh_set) {
   ImGui::End();
 }
 
-void show_color_blend(MeshSettings *mesh_set) {
+void show_lightning(MeshSettings *mesh_set) {
   ImGuiIO& io = ImGui::GetIO(); (void) io;
   ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
   ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
-  ImGui::Begin("color blend", nullptr, window_flags);
+  ImGui::Begin("lightning", nullptr, window_flags);
   ImGui::Separator();
-  ImGui::ColorEdit3("color", &mesh_set->color[0]);
+  ImGui::InputFloat3("lightning position", &mesh_set->light_position[0]);
+  ImGui::ColorEdit3("lightning color", &mesh_set->light_color[0]);
+  ImGui::SliderFloat("ka (ambient)", &mesh_set->ka, 0.0f, 1.0f);
+  ImGui::SliderFloat("kd (diffuse)", &mesh_set->kd, 0.0f, 1.0f);
+  ImGui::SliderFloat("ks (specular)", &mesh_set->ks, 0.0f, 1.0f);
+  ImGui::Separator();
+  ImGui::InputFloat3("camera position", &mesh_set->camera_position[0]);
+  ImGui::Separator();  
+  ImGui::ColorEdit3("bleding color", &mesh_set->color[0]);
   ImGui::SliderFloat("blend factor", &mesh_set->blend, 0.0f, 1.0f);
   ImGui::End();
 }
-
 
 void show_controls(bool *p_open) {
   ImGuiIO& io = ImGui::GetIO(); (void) io;

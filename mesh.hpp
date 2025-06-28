@@ -23,6 +23,7 @@
 
 typedef struct {
   glm::vec4 position;
+  glm::vec3 normal;
   glm::vec4 color;
 } Vertex;
 
@@ -47,12 +48,18 @@ typedef struct {
   glm::vec3 color;
   float blend;
   float stroke;
+  glm::vec3 camera_position;
+  glm::vec3 light_position;
+  glm::vec3 light_color;
+  float ka;
+  float kd;
+  float ks;
 } MeshSettings;
 
 void show_global_info(MeshSettings *mesh_set);
 void show_global_settings(MeshSettings *mesh_set);
 void show_model_matrix(MeshSettings *mesh_set);
-void show_color_blend(MeshSettings *mesh_set);
+void show_lightning(MeshSettings *mesh_set);
 void show_controls(bool *p_open);
 
 #endif /* MESH_H */
