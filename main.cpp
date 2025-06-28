@@ -35,11 +35,13 @@ const static char *vertex_shader_source = R"(
   uniform mat4 v_model;
   uniform mat4 v_view;
   uniform mat4 v_projection;
+  uniform int tex_mode;
   out vec4 color;
   out vec2 frag_coord;
   out float v_z;
   out vec3 normal;
   out vec3 frag_pos;
+  out vec2 tex_coord;
   void main() {
      gl_Position = v_projection * v_view * v_model * v_pos;
      color = v_color;
@@ -47,6 +49,7 @@ const static char *vertex_shader_source = R"(
      frag_coord = v_pos.xy;
      frag_pos = vec3(v_model * v_pos);
      v_z = v_pos.z;
+     tex_coord = v_pos.xy + 0.5f;
   };
 )";
 
@@ -57,25 +60,30 @@ const static char *fragment_shader_source = R"(
   in vec3 normal;
   in vec3 frag_pos;
   in vec2 frag_coord;
+  in vec2 tex_coord;
   in float v_z;
+
   uniform vec2 v_resolution;
   uniform float v_time;
   uniform vec4 v_bord_color;
-  uniform vec4 v_mix_color;
-  uniform float v_blend;
   uniform vec2 v_mouse_pos;
 
+  uniform int v_light;
   uniform vec3 v_camera_position;
   uniform vec3 v_light_position;
   uniform vec3 v_light_color;
   uniform float v_ka;
   uniform float v_kd;
   uniform float v_ks;
+  uniform int v_tex_mode;
+
+  uniform sampler2D tex;
 
   out vec4 FragColor;
 
   void main()
   {
+     vec4 tex_color = (v_tex_mode > 0 ? texture(tex, tex_coord) : vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f));
      vec3 ambient = v_ka * v_light_color;
 
      vec3 l = normalize(v_light_position - frag_pos);
@@ -87,9 +95,9 @@ const static char *fragment_shader_source = R"(
      float spec = pow(max(dot(v, r), 0.0), 3.0);
      vec3 specular = v_ks * spec * v_light_color;
 
-     vec4 light = vec4(ambient + diffuse + specular, 1.0f);
+     vec4 light = v_light == 1 ? vec4(ambient + diffuse + specular, 1.0f) : vec4(1.0f);
 
-     vec4 c = light * vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f);
+     vec4 c = light * tex_color;
 
      //vec2 uv = (frag_coord * 2.0 - frag_coord.xy) / frag_coord.y;
      if (v_bord_color.w > 0.0f) {
@@ -101,12 +109,9 @@ const static char *fragment_shader_source = R"(
        //d = 0.01f / d;
    
        //FragColor = vec4(col, 1.0f);
-       FragColor = mix(color, c, v_blend);
+       FragColor = c;
      } else {
-       //vec4 c1 = mix(c, vec4(c.x * sin(v_time), c.y, c.z * cos(v_time), 1.0f), 0.5f);
-       vec3 c3 = color.xyz;
-       vec3 cm3 = v_mix_color.xyz;
-       FragColor = light * vec4(mix(c3, cm3, v_blend), 1.0f);
+       FragColor = vec4(tex_color.xyz * light.xyz, tex_color.w);
      }
   };
 )";
@@ -250,14 +255,14 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   int v_projection = glGetUniformLocation(program, "v_projection");
   int v_time = glGetUniformLocation(program, "v_time");
   int v_bord_color = glGetUniformLocation(program, "v_bord_color");
-  int v_mix_color = glGetUniformLocation(program, "v_mix_color");
-  int v_blend = glGetUniformLocation(program, "v_blend");
-  int v_camera_position = glGetUniformLocation(program , "v_camera_position");
-  int v_light_position = glGetUniformLocation(program , "v_light_position");
-  int v_light_color = glGetUniformLocation(program , "v_light_color");
-  int v_ka = glGetUniformLocation(program , "v_ka");
-  int v_kd = glGetUniformLocation(program , "v_kd");
-  int v_ks = glGetUniformLocation(program , "v_ks");
+  int v_light = glGetUniformLocation(program, "v_light");
+  int v_camera_position = glGetUniformLocation(program, "v_camera_position");
+  int v_light_position = glGetUniformLocation(program, "v_light_position");
+  int v_light_color = glGetUniformLocation(program, "v_light_color");
+  int v_ka = glGetUniformLocation(program, "v_ka");
+  int v_kd = glGetUniformLocation(program, "v_kd");
+  int v_ks = glGetUniformLocation(program, "v_ks");
+  int v_tex_mode = glGetUniformLocation(program, "v_tex_mode");
 
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
   glUniformMatrix4fv(v_view, 1, GL_FALSE, &view[0][0]);
@@ -266,21 +271,25 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   glUniform2f(v_resolution, mesh_set->resolution.x, mesh_set->resolution.y);
   glUniform1f(v_time, time);
   glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
-  glUniform4f(v_mix_color, mesh_set->color[0], mesh_set->color[1], mesh_set->color[2], 1.0f);
+  if (mesh_set->mode == WIREFRAME)  {
+    glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);
+  }
+  glUniform1i(v_light, (int)mesh_set->light);
+  glUniform1i(v_tex_mode, (int)mesh_set->tex_mode);
   glUniform3f(v_camera_position, mesh_set->camera_position[0], mesh_set->camera_position[1], mesh_set->camera_position[2]);
   glUniform3f(v_light_position, mesh_set->light_position[0], mesh_set->light_position[1], mesh_set->light_position[2]);
   glUniform3f(v_light_color, mesh_set->light_color[0], mesh_set->light_color[1], mesh_set->light_color[2]);
-  glUniform1f(v_blend, mesh_set->blend);
   glUniform1f(v_ka, mesh_set->ka);
   glUniform1f(v_kd, mesh_set->kd);
   glUniform1f(v_ks, mesh_set->ks);
   glLineWidth(mesh_set->stroke);
 
   glBindVertexArray(VAO);
-  glDrawArrays(GL_TRIANGLES, 0, mesh_set->t_verts);
-  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);  
-  glDrawArrays(GL_TRIANGLES, 0, mesh_set->t_verts);
+  //glDrawArrays(GL_TRIANGLES, 0, mesh_set->t_verts);
+  glDrawElements(GL_TRIANGLES, mesh_set->t_index, GL_UNSIGNED_INT, 0);
+  //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  //glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);  
+  //glDrawArrays(GL_TRIANGLES, 0, mesh_set->t_verts);
 }
 
 void loop(GLFWwindow *window) {
@@ -336,15 +345,19 @@ void loop(GLFWwindow *window) {
   int error = compile_shaders(&program);
   if (error != 0) exit(1);
 
-  uint32_t VAO, VBO;
+  uint32_t VAO, VBO, EBO;
 
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
 
   glBindVertexArray(VAO);
   
   glBindBuffer(GL_ARRAY_BUFFER, VBO);
   glBufferData(GL_ARRAY_BUFFER, mesh_set->t_verts * sizeof(Vertex), &mesh_set->vertices[0], GL_STATIC_DRAW);
+
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh_set->indices.size() * sizeof(uint32_t), &mesh_set->indices[0], GL_STATIC_DRAW);
   
   glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, position));
   glEnableVertexAttribArray(0); // location 0
@@ -363,7 +376,34 @@ void loop(GLFWwindow *window) {
 
   glEnable(GL_LINE_SMOOTH);
   glEnable(GL_POLYGON_SMOOTH);
+  glEnable(GL_MULTISAMPLE);
 
+  stbi_set_flip_vertically_on_load(1);
+  unsigned int tex;
+  
+  glGenTextures(1, &tex);
+  glBindTexture(GL_TEXTURE_2D, tex);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+  int i_width, i_height, nr_channels;
+
+  if (mesh_set->tex_file != nullptr) {
+    // load image, create texture and generate mipmaps
+    unsigned char *data = stbi_load(mesh_set->tex_file, &width, &height, &nr_channels, 0);
+    if (data) {
+      glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+      glGenerateMipmap(GL_TEXTURE_2D);
+    } else {
+      std::cout << "ERROR: Failed to load texture" << std::endl;
+      exit(1);
+    }
+  
+    stbi_image_free(data); // loaded
+  }
+  (void)i_width, (void)i_height;
 
   float start_time = glfwGetTime();
   float delta = 0.0f;
@@ -420,6 +460,17 @@ void loop(GLFWwindow *window) {
 	key_time = start_time;
 	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
       }
+    } else if (is_key_pressed(window, GLFW_KEY_1)) {
+      if (start_time - key_time > key_threshold) {
+	key_time = start_time;
+	mesh_set->light = !mesh_set->light;
+      }
+    } else if (is_key_pressed(window, GLFW_KEY_2)) {
+      if (start_time - key_time > key_threshold) {
+	key_time = start_time;
+	if (mesh_set->tex_mode == ORTHO) mesh_set->tex_mode = NO_TEX;
+	else mesh_set->tex_mode = ORTHO;
+      } 
     }
 
     glPolygonMode(GL_FRONT_AND_BACK, mesh_set->mode == FILL_POLYGON ? GL_FILL : GL_LINE);
@@ -447,14 +498,17 @@ void loop(GLFWwindow *window) {
       // draw
       {
 	//glClearColor(1.0 * (mouse_pos.x/1000.0f), 1.0 * (mouse_pos.y/1000.0f), 1.0 * (((mouse_pos.x + mouse_pos.y) / 2) / 1000.0f), 1.0);
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
       }
 
     }
 
-
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(mesh_set->bg_color[0], mesh_set->bg_color[1], mesh_set->bg_color[2], 1.0f);
     glUseProgram(program);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    
     draw(VAO, program, mesh_set, get_mouse_pos(window));
 
     if (ImGui::IsKeyPressed(ImGuiKey_K)) help = !help;
@@ -491,6 +545,7 @@ int main(int argc, char **argv) {
   glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
   glfwWindowHint(GLFW_DECORATED, GLFW_TRUE);
   glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+  glfwWindowHint(GLFW_SAMPLES, 4);
 
   const char *title = "trackball - pizza";
 

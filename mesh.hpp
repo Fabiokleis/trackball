@@ -18,6 +18,10 @@
 #define UP_KEY "(seta para cima): faz deslocamento postivo em y."
 #define LEFT_KEY "(seta para esquerda): faz deslocamento negativo em x."
 #define RIGHT_KEY "(seta para direita): faz deslocamento positivo em x."
+#define LIGHT_KEY "(1): habilita/desabilita o modo de iluminação phong."
+#define TEX_ORTHO "(2): habilita/desabilita o mapeamento de textura com projeção paralela sobre a imagem da textura."
+#define TEX_CIL "(3): habilita/desabilita o mapeamento de textura com coordenadas cilíndricas."
+#define TEX_SPH "(4): habilita/desabilita o mapeamento de textura com coordenadas esféricas."
 #define K_KEY "(k): abre/fecha a tela de controles."
 #define KEYS "para ler novamente passe a opção -k ou acesse a tela de controles."
 
@@ -32,12 +36,23 @@ enum VISUALIZATION_MODE {
   WIREFRAME,
 };
 
+enum TEXTURE_MODE {
+  NO_TEX,
+  ORTHO,
+  CIL,
+  SPH,
+};
+
 typedef struct {
   const char *obj_file;
+  const char *tex_file;
   glm::vec2 resolution; 
   VISUALIZATION_MODE mode;
+  TEXTURE_MODE tex_mode;
   std::vector<Vertex> vertices;
   uint64_t t_verts;
+  std::vector<uint32_t> indices;
+  uint64_t t_index;
   glm::vec3 center;
   glm::vec2 mouse_pos;
   bool rotating;
@@ -46,8 +61,9 @@ typedef struct {
   glm::vec3 scale;
   float scale_factor;
   glm::vec3 color;
-  float blend;
+  glm::vec3 bg_color;
   float stroke;
+  bool light;
   glm::vec3 camera_position;
   glm::vec3 light_position;
   glm::vec3 light_color;

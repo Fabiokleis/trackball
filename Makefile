@@ -1,5 +1,5 @@
 CC = g++
-EXE = mesh
+EXE = mesh2
 IMGUI_DIR = ./dependencies/imgui
 SOURCES = main.cpp mesh.cpp obj.cpp
 SOURCES += $(IMGUI_DIR)/imgui.cpp $(IMGUI_DIR)/imgui_draw.cpp $(IMGUI_DIR)/imgui_tables.cpp $(IMGUI_DIR)/imgui_widgets.cpp
@@ -23,7 +23,7 @@ ECHO_MESSAGE = "linux compiled $(EXE)"
 all: $(EXE)
 	@echo $(ECHO_MESSAGE)
 
-obj.o: obj.cpp obj.hpp
+obj.o: obj.cpp obj.hpp mesh.hpp
 	$(CXX) -c $<
 
 $(EXE): $(OBJS)

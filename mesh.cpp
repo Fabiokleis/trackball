@@ -56,16 +56,44 @@ void show_global_settings(MeshSettings *mesh_set) {
   
   if (ImGui::Begin("mesh", nullptr, window_flags)) {
     ImGui::Text("malha: %s", mesh_set->obj_file);
-    ImGui::Text("modo (v): %s", mesh_set->mode == FILL_POLYGON ? "fill polygon" : "polygon wireframe");
+    ImGui::Text("textura: %s", mesh_set->tex_file);
+    ImGui::Text("modo de visualização (v): %s", mesh_set->mode == FILL_POLYGON ? "fill polygon" : "polygon wireframe");
+    ImGui::Text("luz (1): %s", mesh_set->light ? "ligada" : "desligada");
+    switch (mesh_set->tex_mode) {
+    case ORTHO:
+      ImGui::Text("modo de textura: %s", "ortografica");
+      break;
+    case NO_TEX:
+    default:
+      ImGui::Text("modo de textura: %s", "cor do objeto");
+    }
+
     ImGui::Separator();
     ImGui::Text("vertices: %lu", mesh_set->t_verts);
-    ImGui::Text("triangulos: %lu", mesh_set->t_verts / 3);
+    ImGui::Text("indices: %lu", mesh_set->t_index);
+    ImGui::Text("triangulos: %lu", mesh_set->t_index / 3);
 
     if (ImGui::BeginPopupContextWindow()) {
-      if (ImGui::MenuItem("trocar modo (v)", NULL, menu_item == 1)) {
+      if (ImGui::MenuItem("trocar modo de visualização (v)", NULL, menu_item == 1)) {
 	menu_item = 0;
 	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
+      } else if (ImGui::MenuItem("ligar/desligar luz (1)", NULL, menu_item == 2)) {
+	menu_item = 0;
+	mesh_set->light = !mesh_set->light;
+      } else if (ImGui::MenuItem("habilitar/desabilitar textura ortografica (2)", NULL, menu_item == 3)) {
+	menu_item = 0;
+	if (mesh_set->tex_mode == NO_TEX) mesh_set->tex_mode = ORTHO;
+	else mesh_set->tex_mode = NO_TEX;
+      } else if (ImGui::MenuItem("habilitar/desabilitar modo de textura cilíndrica (3)", NULL, menu_item == 4)) {
+	menu_item = 0;
+	if (mesh_set->tex_mode == NO_TEX) mesh_set->tex_mode = CIL;
+	else mesh_set->tex_mode = NO_TEX;
+      } else if (ImGui::MenuItem("habilitar/desabilitar modo de textura esférica (4)", NULL, menu_item == 5)) {
+	menu_item = 0;
+	if (mesh_set->tex_mode == NO_TEX) mesh_set->tex_mode = SPH;
+	else mesh_set->tex_mode = NO_TEX;
       }
+      
       ImGui::EndPopup();
     }
   }
@@ -93,19 +121,17 @@ void show_model_matrix(MeshSettings *mesh_set) {
 void show_lightning(MeshSettings *mesh_set) {
   ImGuiIO& io = ImGui::GetIO(); (void) io;
   ImGuiWindowFlags window_flags =  ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing;
-  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
   ImGui::Begin("lightning", nullptr, window_flags);
+  ImGui::SetNextWindowBgAlpha(0.35f); // Transparent background
+  ImGui::Separator();
+  ImGui::ColorEdit3("background color", &mesh_set->bg_color[0]);
+  ImGui::ColorEdit3("lightning color", &mesh_set->light_color[0]);
   ImGui::Separator();
   ImGui::InputFloat3("lightning position", &mesh_set->light_position[0]);
-  ImGui::ColorEdit3("lightning color", &mesh_set->light_color[0]);
+  ImGui::InputFloat3("camera position", &mesh_set->camera_position[0]);
   ImGui::SliderFloat("ka (ambient)", &mesh_set->ka, 0.0f, 1.0f);
   ImGui::SliderFloat("kd (diffuse)", &mesh_set->kd, 0.0f, 1.0f);
   ImGui::SliderFloat("ks (specular)", &mesh_set->ks, 0.0f, 1.0f);
-  ImGui::Separator();
-  ImGui::InputFloat3("camera position", &mesh_set->camera_position[0]);
-  ImGui::Separator();  
-  ImGui::ColorEdit3("bleding color", &mesh_set->color[0]);
-  ImGui::SliderFloat("blend factor", &mesh_set->blend, 0.0f, 1.0f);
   ImGui::End();
 }
 
@@ -125,5 +151,9 @@ void show_controls(bool *p_open) {
   ImGui::BulletText("%s", DOWN_KEY);
   ImGui::BulletText("%s", LEFT_KEY);
   ImGui::BulletText("%s", RIGHT_KEY);
+  ImGui::BulletText("%s", LIGHT_KEY);
+  ImGui::BulletText("%s", TEX_ORTHO);
+  ImGui::BulletText("%s", TEX_CIL);
+  ImGui::BulletText("%s", TEX_SPH);
   ImGui::End();
 }

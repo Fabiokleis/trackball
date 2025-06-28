@@ -1,3 +1,6 @@
 main
 mesh
+mesh2
 *.o
+models/
+models/!(bunny.obj|cube.obj)
