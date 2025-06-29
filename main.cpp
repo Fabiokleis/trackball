@@ -35,21 +35,59 @@ const static char *vertex_shader_source = R"(
   uniform mat4 v_model;
   uniform mat4 v_view;
   uniform mat4 v_projection;
-  uniform int tex_mode;
+  uniform int v_tex_mode;
   out vec4 color;
   out vec2 frag_coord;
   out float v_z;
   out vec3 normal;
   out vec3 frag_pos;
   out vec2 tex_coord;
+
+  #define PI 3.1415926535897932384626433832795
+  #define NO_TEX 0
+  #define ORTHO 1
+  #define CIL 2
+  #define SPH 3
+
+  vec2 ortho(vec3 pos) {
+    return pos.xy + 0.5f; // -1 .. 1
+  }
+
+  vec2 cil(vec3 pos) {
+    float u = (PI + atan(pos.y, pos.x)) / (2 * PI);
+    float v = 0.5f + (0.5f * pos.z);
+    return vec2(u, v);
+  }
+
+  vec2 sph(vec3 pos) {
+    float u = (PI + atan(pos.y, pos.x)) / (2 * PI);
+    float v = (PI - acos(pos.z / (length(pos.xyz)))) / PI;
+    return vec2(u, v);
+  }
+
   void main() {
-     gl_Position = v_projection * v_view * v_model * v_pos;
-     color = v_color;
-     normal = mat3(transpose(inverse(v_model))) * v_normal;
-     frag_coord = v_pos.xy;
-     frag_pos = vec3(v_model * v_pos);
-     v_z = v_pos.z;
-     tex_coord = v_pos.xy + 0.5f;
+    gl_Position = v_projection * v_view * v_model * v_pos;
+    color = v_color;
+    normal = mat3(transpose(inverse(v_model))) * v_normal;
+    frag_pos = vec3(v_model * v_pos);
+    v_z = v_pos.z;
+
+    vec3 norm_pos = v_pos.xyz;
+    switch (v_tex_mode) {
+    case ORTHO:
+      tex_coord = ortho(v_pos.xyz);
+      break;
+    case CIL:
+      tex_coord = cil(norm_pos);
+      break;
+    case SPH:
+      tex_coord = sph(norm_pos);
+      break;
+    case NO_TEX:
+    default:
+      //tex_coord = ortho();
+      break;
+    }
   };
 )";
 
@@ -59,13 +97,11 @@ const static char *fragment_shader_source = R"(
   in vec4 color;
   in vec3 normal;
   in vec3 frag_pos;
-  in vec2 frag_coord;
   in vec2 tex_coord;
   in float v_z;
 
   uniform vec2 v_resolution;
   uniform float v_time;
-  uniform vec4 v_bord_color;
   uniform vec2 v_mouse_pos;
 
   uniform int v_light;
@@ -75,15 +111,14 @@ const static char *fragment_shader_source = R"(
   uniform float v_ka;
   uniform float v_kd;
   uniform float v_ks;
+  uniform float v_ksb;
   uniform int v_tex_mode;
 
   uniform sampler2D tex;
 
   out vec4 FragColor;
 
-  void main()
-  {
-     vec4 tex_color = (v_tex_mode > 0 ? texture(tex, tex_coord) : vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f));
+  vec4 phong() {
      vec3 ambient = v_ka * v_light_color;
 
      vec3 l = normalize(v_light_position - frag_pos);
@@ -92,27 +127,20 @@ const static char *fragment_shader_source = R"(
 
      vec3 v = normalize(v_camera_position - frag_pos);
      vec3 r = reflect(-l, normal);
-     float spec = pow(max(dot(v, r), 0.0), 3.0);
+     float spec = pow(max(dot(v, r), 0.0), v_ksb);
      vec3 specular = v_ks * spec * v_light_color;
 
-     vec4 light = v_light == 1 ? vec4(ambient + diffuse + specular, 1.0f) : vec4(1.0f);
+     vec4 out_light = vec4(ambient + diffuse + specular, 1.0f);
+     return out_light;
+  }
 
-     vec4 c = light * tex_color;
-
-     //vec2 uv = (frag_coord * 2.0 - frag_coord.xy) / frag_coord.y;
-     if (v_bord_color.w > 0.0f) {
-
-       //float d = length(uv);
-       //vec3 col = 0.5 + 0.5 * cos(v_time + uv.xyx + vec3(1.0f, 2.0f, 3.0f));
-       //d = sin(d * 8.0f + v_time) / 8.0f;
-       //d = abs(d);
-       //d = 0.01f / d;
-   
-       //FragColor = vec4(col, 1.0f);
-       FragColor = c;
-     } else {
-       FragColor = vec4(tex_color.xyz * light.xyz, tex_color.w);
-     }
+  void main()
+  {
+     vec4 light = v_light == 1 ? phong() : vec4(1.0f);
+     vec4 color = vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f);
+     vec4 tex_color = texture(tex, tex_coord);
+     vec4 out_color = light * (v_tex_mode > 0 ? tex_color : color);
+     FragColor = out_color;
   };
 )";
 
@@ -227,7 +255,7 @@ glm::quat rotation_calc(glm::vec2 l_mouse_pos, glm::vec2 c_mouse_pos) {
 void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mouse_pos) {
   float time = (float)glfwGetTime();
   glm::mat4 view = glm::mat4(1.0f);
-  view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), 
+  view = glm::lookAt(mesh_set->camera_position, 
 		     glm::vec3(0.0f, 0.0f, 0.0f), 
 		     glm::vec3(0.0f, 1.0f, 0.0f));
   
@@ -245,7 +273,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   
   model = model * glm::mat4_cast(mesh_set->rotation);
   model = glm::scale(model, mesh_set->scale);
-  model = glm::translate(model, -mesh_set->center);
+  //model = glm::translate(model, -mesh_set->center); nao precisa mais
 
   projection = glm::perspective(glm::radians(45.0f), (float)WIDTH / (float)HEIGHT, 0.1f, 100.0f);
 
@@ -254,7 +282,6 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   int v_view = glGetUniformLocation(program, "v_view");
   int v_projection = glGetUniformLocation(program, "v_projection");
   int v_time = glGetUniformLocation(program, "v_time");
-  int v_bord_color = glGetUniformLocation(program, "v_bord_color");
   int v_light = glGetUniformLocation(program, "v_light");
   int v_camera_position = glGetUniformLocation(program, "v_camera_position");
   int v_light_position = glGetUniformLocation(program, "v_light_position");
@@ -262,6 +289,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   int v_ka = glGetUniformLocation(program, "v_ka");
   int v_kd = glGetUniformLocation(program, "v_kd");
   int v_ks = glGetUniformLocation(program, "v_ks");
+  int v_ksb = glGetUniformLocation(program, "v_ksb");
   int v_tex_mode = glGetUniformLocation(program, "v_tex_mode");
 
   glUniformMatrix4fv(v_model, 1, GL_FALSE, &model[0][0]);
@@ -270,10 +298,6 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
 
   glUniform2f(v_resolution, mesh_set->resolution.x, mesh_set->resolution.y);
   glUniform1f(v_time, time);
-  glUniform4f(v_bord_color, -1.0f, -1.0f, -1.0f, -1.0f);
-  if (mesh_set->mode == WIREFRAME)  {
-    glUniform4f(v_bord_color, 0.1f, 0.0f, 0.0f, 1.0f);
-  }
   glUniform1i(v_light, (int)mesh_set->light);
   glUniform1i(v_tex_mode, (int)mesh_set->tex_mode);
   glUniform3f(v_camera_position, mesh_set->camera_position[0], mesh_set->camera_position[1], mesh_set->camera_position[2]);
@@ -282,6 +306,7 @@ void draw(uint32_t VAO, uint32_t program, MeshSettings* mesh_set, glm::vec2 c_mo
   glUniform1f(v_ka, mesh_set->ka);
   glUniform1f(v_kd, mesh_set->kd);
   glUniform1f(v_ks, mesh_set->ks);
+  glUniform1f(v_ksb, mesh_set->ksb);
   glLineWidth(mesh_set->stroke);
 
   glBindVertexArray(VAO);
@@ -383,19 +408,18 @@ void loop(GLFWwindow *window) {
   
   glGenTextures(1, &tex);
   glBindTexture(GL_TEXTURE_2D, tex);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
   int i_width, i_height, nr_channels;
 
   if (mesh_set->tex_file != nullptr) {
-    // load image, create texture and generate mipmaps
     unsigned char *data = stbi_load(mesh_set->tex_file, &width, &height, &nr_channels, 0);
     if (data) {
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-      glGenerateMipmap(GL_TEXTURE_2D);
+      //glGenerateMipmap(GL_TEXTURE_2D);
     } else {
       std::cout << "ERROR: Failed to load texture" << std::endl;
       exit(1);
@@ -460,19 +484,27 @@ void loop(GLFWwindow *window) {
 	key_time = start_time;
 	mesh_set->mode = (VISUALIZATION_MODE)(((uint32_t)mesh_set->mode + 1) % (WIREFRAME + 1));
       }
-    } else if (is_key_pressed(window, GLFW_KEY_1)) {
-      if (start_time - key_time > key_threshold) {
-	key_time = start_time;
-	mesh_set->light = !mesh_set->light;
-      }
-    } else if (is_key_pressed(window, GLFW_KEY_2)) {
-      if (start_time - key_time > key_threshold) {
-	key_time = start_time;
-	if (mesh_set->tex_mode == ORTHO) mesh_set->tex_mode = NO_TEX;
-	else mesh_set->tex_mode = ORTHO;
-      } 
     }
 
+    if (start_time - key_time > key_threshold && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AnyWindow) && !ImGui::IsAnyItemActive()) {
+      if (is_key_pressed(window, GLFW_KEY_1)) {
+	mesh_set->light = !mesh_set->light;
+	key_time = start_time;
+      } else if (is_key_pressed(window, GLFW_KEY_2)) {
+	if (mesh_set->tex_mode == ORTHO) mesh_set->tex_mode = NO_TEX;
+	else mesh_set->tex_mode = ORTHO;
+	key_time = start_time;
+      } else if (is_key_pressed(window, GLFW_KEY_3)) {
+	if (mesh_set->tex_mode == CIL) mesh_set->tex_mode = NO_TEX;
+	else mesh_set->tex_mode = CIL;
+	key_time = start_time;
+      } else if (is_key_pressed(window, GLFW_KEY_4)) {
+	if (mesh_set->tex_mode == SPH) mesh_set->tex_mode = NO_TEX;
+	else mesh_set->tex_mode = SPH;
+	key_time = start_time;
+      }
+    }
+    
     glPolygonMode(GL_FRONT_AND_BACK, mesh_set->mode == FILL_POLYGON ? GL_FILL : GL_LINE);
 
     if (is_mouse_button_pressed(window, GLFW_MOUSE_BUTTON_LEFT)) {

@@ -148,7 +148,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
   float tam_x = max_x - min_x;
   float tam_y = max_y - min_y;
   float tam_z = max_z - min_z;
-
+  
   float maior_dim = std::max(std::max(tam_x, tam_y), tam_z);
   
   float escala = 1.0f / maior_dim;
@@ -176,7 +176,6 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     verts[i].normal = glm::normalize(verts[i].normal);
     // aplica translacao -centro e escala 
     verts[i].position = glm::vec4((glm::vec3(verts[i].position) - center) * escala, 1.0f);
-    
   }
   
   return (MeshSettings){
@@ -189,7 +188,7 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     .t_verts = verts.size(),
     .indices = indices,
     .t_index = indices.size(),
-    .center = glm::vec3(0.0f),
+    .center = center,
     .mouse_pos = glm::vec2(0.0f),
     .rotating = false,
     .rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
@@ -200,11 +199,12 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     .bg_color = glm::vec4(0.150f, 0.151f, 0.167f, 1.000f),
     .stroke = 1.0f,
     .light = false,
-    .camera_position = glm::vec3(0.0f),
+    .camera_position = glm::vec3(0.0f, 0.0f, 3.0f),
     .light_position = glm::vec3(1.0f, 0.0f, 2.0f),
     .light_color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
     .ka = 0.5f,
     .kd = 0.8f,
     .ks = 1.0f,
+    .ksb = 3.0f,
   };
 }

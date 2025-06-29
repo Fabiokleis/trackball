@@ -63,9 +63,15 @@ void show_global_settings(MeshSettings *mesh_set) {
     case ORTHO:
       ImGui::Text("modo de textura: %s", "ortografica");
       break;
+    case CIL:
+      ImGui::Text("modo de textura: %s", "cilíndrica");
+      break;
+    case SPH:
+      ImGui::Text("modo de textura: %s", "esférica");
+      break;
     case NO_TEX:
     default:
-      ImGui::Text("modo de textura: %s", "cor do objeto");
+      ImGui::Text("modo de textura: %s", "sem textura");
     }
 
     ImGui::Separator();
@@ -129,9 +135,10 @@ void show_lightning(MeshSettings *mesh_set) {
   ImGui::Separator();
   ImGui::InputFloat3("lightning position", &mesh_set->light_position[0]);
   ImGui::InputFloat3("camera position", &mesh_set->camera_position[0]);
-  ImGui::SliderFloat("ka (ambient)", &mesh_set->ka, 0.0f, 1.0f);
-  ImGui::SliderFloat("kd (diffuse)", &mesh_set->kd, 0.0f, 1.0f);
-  ImGui::SliderFloat("ks (specular)", &mesh_set->ks, 0.0f, 1.0f);
+  ImGui::SliderFloat("ka (ambiente)", &mesh_set->ka, 0.0f, 1.0f);
+  ImGui::SliderFloat("kd (difusa)", &mesh_set->kd, 0.0f, 1.0f);
+  ImGui::SliderFloat("ks (especular)", &mesh_set->ks, 0.0f, 1.0f);
+  ImGui::InputFloat("atenuacao de brilho", &mesh_set->ksb);
   ImGui::End();
 }
 

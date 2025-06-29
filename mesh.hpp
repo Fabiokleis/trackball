@@ -37,7 +37,7 @@ enum VISUALIZATION_MODE {
 };
 
 enum TEXTURE_MODE {
-  NO_TEX,
+  NO_TEX = 0,
   ORTHO,
   CIL,
   SPH,
@@ -70,6 +70,7 @@ typedef struct {
   float ka;
   float kd;
   float ks;
+  float ksb;
 } MeshSettings;
 
 void show_global_info(MeshSettings *mesh_set);
