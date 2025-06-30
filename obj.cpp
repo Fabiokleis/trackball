@@ -41,8 +41,8 @@ MeshSettings ObjLoader::load_obj(int argc, char **argv) {
     } break;
     case 'h':
     default: {
-      	  std::cout << "para executar o mesh passe um arquivo .obj e uma textura: " << std::endl;
-	  std::cout << "./mesh cube.obj noteblock.png" << std::endl << std::endl;
+      	  std::cout << "para executar o mesh passe um arquivo .obj e uma textura png 8bpc: " << std::endl;
+	  std::cout << "./mesh cube.obj tex.png" << std::endl << std::endl;
       	  std::cout << "opções: " << std::endl;
 	  std::cout << "-h: mostra essa mensagem." << std::endl;
 	  std::cout << "-k: mostra a mensagem de controles." << std::endl;
