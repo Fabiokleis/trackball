@@ -35,59 +35,17 @@ const static char *vertex_shader_source = R"(
   uniform mat4 v_model;
   uniform mat4 v_view;
   uniform mat4 v_projection;
-  uniform int v_tex_mode;
   out vec4 color;
-  out vec2 frag_coord;
-  out float v_z;
   out vec3 normal;
   out vec3 frag_pos;
-  out vec2 tex_coord;
-
-  #define PI 3.1415926535897932384626433832795
-  #define NO_TEX 0
-  #define ORTHO 1
-  #define CIL 2
-  #define SPH 3
-
-  vec2 ortho(vec3 pos) {
-    return pos.xy + 0.5f; // -1 .. 1
-  }
-
-  vec2 cil(vec3 pos) {
-    float u = (PI + atan(pos.y, pos.x)) / (2 * PI);
-    float v = 0.5f + (0.5f * pos.z);
-    return vec2(u, v);
-  }
-
-  vec2 sph(vec3 pos) {
-    float u = (PI + atan(pos.y, pos.x)) / (2 * PI);
-    float v = (PI - acos(pos.z / (length(pos.xyz)))) / PI;
-    return vec2(u, v);
-  }
+  out vec3 vpos;
 
   void main() {
     gl_Position = v_projection * v_view * v_model * v_pos;
     color = v_color;
     normal = mat3(transpose(inverse(v_model))) * v_normal;
     frag_pos = vec3(v_model * v_pos);
-    v_z = v_pos.z;
-
-    vec3 norm_pos = v_pos.xyz;
-    switch (v_tex_mode) {
-    case ORTHO:
-      tex_coord = ortho(v_pos.xyz);
-      break;
-    case CIL:
-      tex_coord = cil(norm_pos);
-      break;
-    case SPH:
-      tex_coord = sph(norm_pos);
-      break;
-    case NO_TEX:
-    default:
-      //tex_coord = ortho();
-      break;
-    }
+    vpos = vec3(v_pos);
   };
 )";
 
@@ -97,8 +55,7 @@ const static char *fragment_shader_source = R"(
   in vec4 color;
   in vec3 normal;
   in vec3 frag_pos;
-  in vec2 tex_coord;
-  in float v_z;
+  in vec3 vpos;
 
   uniform vec2 v_resolution;
   uniform float v_time;
@@ -118,6 +75,13 @@ const static char *fragment_shader_source = R"(
 
   out vec4 FragColor;
 
+  #define PI 3.1415926535897932384626433832795
+  #define NO_TEX 0
+  #define ORTHO 1
+  #define CIL 2
+  #define SPH 3
+
+
   vec4 phong() {
      vec3 ambient = v_ka * v_light_color;
 
@@ -134,12 +98,47 @@ const static char *fragment_shader_source = R"(
      return out_light;
   }
 
+  vec2 ortho(vec3 pos) {
+    return pos.xy + 0.5f; // -1 .. 1
+  }
+
+  vec2 cil(vec3 pos) {
+    float u = (PI + atan(pos.z, pos.x)) / (2 * PI);
+    float v = 0.5f + (0.5f * pos.y);
+    return vec2(u, v);
+  }
+
+  vec2 sph(vec3 pos) {
+    float u = (PI + atan(pos.z, pos.x)) / (2 * PI);
+    float v = (acos(pos.y / (length(pos.xyz)))) / PI;
+    return vec2(u, v);
+  }
+
+
   void main()
   {
      vec4 light = v_light == 1 ? phong() : vec4(1.0f);
      vec4 color = vec4(0.5f + 0.5 * cos(v_time + color.xyz + vec3(0.0f, 2.0f, 4.0f)), 1.0f);
-     vec4 tex_color = texture(tex, tex_coord);
+
+     vec2 uv = vpos.xy;
+     switch (v_tex_mode) {
+     case ORTHO:
+       uv = ortho(vpos.xyz);
+       break;
+     case CIL:
+       uv = cil(vpos.xyz);
+       break;
+     case SPH:
+       uv = sph(vpos.xyz);
+       break;
+     case NO_TEX:
+     default:
+      break;
+     }
+
+     vec4 tex_color = texture(tex, uv);
      vec4 out_color = light * (v_tex_mode > 0 ? tex_color : color);
+
      FragColor = out_color;
   };
 )";
@@ -419,7 +418,7 @@ void loop(GLFWwindow *window) {
     unsigned char *data = stbi_load(mesh_set->tex_file, &width, &height, &nr_channels, 0);
     if (data) {
       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-      //glGenerateMipmap(GL_TEXTURE_2D);
+      glGenerateMipmap(GL_TEXTURE_2D);
     } else {
       std::cout << "ERROR: Failed to load texture" << std::endl;
       exit(1);
